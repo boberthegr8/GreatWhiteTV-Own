@@ -1,0 +1,33 @@
+name: Export Android apksigner
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["gws-v1"]
+    paths:
+      - ".github/workflows/export-apksigner.yml"
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Locate apksigner
+        id: locate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find "$ANDROID_SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -1)"
+          test -n "$APK" && test -f "$APK"
+          DIR="$(dirname "$APK")"
+          mkdir -p "$RUNNER_TEMP/apksigner-tool"
+          cp "$APK" "$RUNNER_TEMP/apksigner-tool/apksigner"
+          cp -R "$DIR/lib" "$RUNNER_TEMP/apksigner-tool/lib"
+          chmod +x "$RUNNER_TEMP/apksigner-tool/apksigner"
+          "$RUNNER_TEMP/apksigner-tool/apksigner" version
+
+      - name: Upload apksigner
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apksigner-tool
+          path: ${{ runner.temp }}/apksigner-tool
+          if-no-files-found: error
