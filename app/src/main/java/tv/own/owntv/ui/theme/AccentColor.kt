@@ -5,12 +5,8 @@ import androidx.compose.ui.graphics.Color
 import tv.own.owntv.R
 
 /**
- * Material You-style accent presets. OwnTV can't rely on true wallpaper-based dynamic color (a phone
- * feature that isn't dependable on Android TV), so instead the user picks an accent and the M3 color
- * scheme is seeded from it. Each preset carries its tonal `primary` / `primaryContainer` roles for
- * both dark and light themes (M3 uses lighter tones on dark surfaces, darker tones on light).
- *
- * Neutrals (background, surface containers, text, outline) are theme-only and live in [OwnTVColors].
+ * Material You-style accent presets. The default TEAL slot is Great White's aqua so a fresh
+ * installation immediately matches the GWS identity while the other user-selectable accents remain.
  */
 enum class AccentColor(
     @param:StringRes val labelRes: Int,
@@ -25,10 +21,10 @@ enum class AccentColor(
 ) {
     TEAL(
         R.string.settings_accent_teal,
-        primaryDark = Color(0xFF52DBC8), onPrimaryDark = Color(0xFF003730),
-        primaryContainerDark = Color(0xFF004F46), onPrimaryContainerDark = Color(0xFF6FF8E4),
-        primaryLight = Color(0xFF006B5E), onPrimaryLight = Color(0xFFFFFFFF),
-        primaryContainerLight = Color(0xFF6FF8E4), onPrimaryContainerLight = Color(0xFF00201B),
+        primaryDark = Color(0xFF2DE2C4), onPrimaryDark = Color(0xFF002F29),
+        primaryContainerDark = Color(0xFF07554A), onPrimaryContainerDark = Color(0xFF8CFFE9),
+        primaryLight = Color(0xFF087A68), onPrimaryLight = Color(0xFFFFFFFF),
+        primaryContainerLight = Color(0xFF9FFFEA), onPrimaryContainerLight = Color(0xFF00201B),
     ),
     BLUE(
         R.string.settings_accent_blue,
