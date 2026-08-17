@@ -56,8 +56,8 @@ jobs:
         run: chmod +x gradlew
 
       # OwnTV's upstream translation literal inventory intentionally tracks upstream brand strings.
-      # Great White carries technical fork identifiers (repo, APK filename, log tags), so this one
-      # upstream-only QA gate is skipped while the actual unit tests still run normally.
+      # Great White carries technical fork identifiers, so this upstream-only QA gate is skipped
+      # while the real Android/JVM unit tests still run normally.
       - name: Run unit tests
         run: ./gradlew :app:testStandardDebugUnitTest -x verifyI18nLiterals
 
@@ -74,6 +74,23 @@ jobs:
         with:
           name: GreatWhiteTV-test
           path: app/build/outputs/apk/standard/debug/*.apk
+          if-no-files-found: error
+
+      # Produce an unsigned release package too. The first Great White signing identity is applied
+      # privately after CI, so the private key never needs to be committed to this public GPL fork.
+      - name: Build unsigned release APK for private signing
+        if: steps.version.outputs.release != 'true'
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version }}
+          VERSION_CODE: ${{ steps.version.outputs.version_code }}
+        run: ./gradlew :app:assembleStandardRelease -x verifyI18nLiterals
+
+      - name: Upload unsigned release APK
+        if: steps.version.outputs.release != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GreatWhiteTV-unsigned-release
+          path: app/build/outputs/apk/standard/release/*.apk
           if-no-files-found: error
 
       - name: Require permanent signing secrets
