@@ -6,27 +6,30 @@ The Android applicationId is changed at build time, which is what Android uses t
 this is a separate installed app.
 """
 from pathlib import Path
+import re
 
 
-def replace_once(path: str, old: str, new: str) -> None:
+def replace_pattern(path: str, pattern: str, replacement) -> None:
     p = Path(path)
     text = p.read_text(encoding="utf-8")
-    count = text.count(old)
+    changed, count = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
     if count != 1:
-        raise SystemExit(f"Expected exactly one match in {path!r}, found {count}: {old!r}")
-    p.write_text(text.replace(old, new, 1), encoding="utf-8")
+        raise SystemExit(f"Expected exactly one match in {path!r}, found {count}: {pattern!r}")
+    p.write_text(changed, encoding="utf-8")
 
 
-replace_once(
+replace_pattern(
     "app/build.gradle.kts",
-    'applicationId = "tv.own.owntv"',
-    'applicationId = "com.greatwhitestreams.tv"',
+    r'^(\s*)applicationId\s*=\s*"[^"]+"\s*$',
+    lambda m: f'{m.group(1)}applicationId = "com.greatwhitestreams.tv"',
 )
 
-replace_once(
-    "app/src/main/res/values/strings.xml",
-    '<string name="app_name">OwnTV</string>',
-    '<string name="app_name">Great White Streams TV</string>',
+# OwnTV's localized string layout changes upstream. Brand the Android launcher label directly in
+# the manifest instead of depending on where app_name happens to live in a particular upstream tag.
+replace_pattern(
+    "app/src/main/AndroidManifest.xml",
+    r'^(\s*)android:label\s*=\s*"@string/app_name"\s*$',
+    lambda m: f'{m.group(1)}android:label="Great White Streams TV"',
 )
 
 print("Great White build identity applied:")
