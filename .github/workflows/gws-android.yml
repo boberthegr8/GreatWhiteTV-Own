@@ -47,9 +47,11 @@ jobs:
             echo "version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
           else
+            # Development branch still uses the real first-release lineage so the APK Rob installs
+            # today can be upgraded by 1.0.1+ instead of being stranded behind OwnTV's 99999 dev code.
             echo "release=false" >> "$GITHUB_OUTPUT"
-            echo "version=0.0.0-dev" >> "$GITHUB_OUTPUT"
-            echo "version_code=99999" >> "$GITHUB_OUTPUT"
+            echo "version=1.0.0" >> "$GITHUB_OUTPUT"
+            echo "version_code=10000" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Make Gradle wrapper executable
