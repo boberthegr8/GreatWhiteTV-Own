@@ -19,11 +19,9 @@ import java.io.File
 import java.io.IOException
 
 /**
- * In-app updates straight from GitHub Releases: checks the repo's latest release, compares its tag
- * with the installed version, downloads the release APK, and hands it to the system installer.
- * No server of our own — the releases CI already publishes `OwnTV-vX.Y.Z.apk` (arm) and
- * `OwnTV-x86_64-vX.Y.Z.apk` per tag; the asset matching this device's ABI is chosen, so updates
- * also work on an x86_64 emulator.
+ * In-app updates straight from GitHub Releases: checks the Great White Streams TV fork's latest
+ * release, compares its tag with the installed version, downloads the release APK, and hands it to
+ * the system installer. Releases carry one APK per ABI so the updater never installs the wrong build.
  */
 class UpdateManager(
     private val context: Context,
@@ -82,7 +80,7 @@ class UpdateManager(
                 val request = Request.Builder()
                     .url("https://api.github.com/repos/$REPO/releases/latest")
                     .header("Accept", "application/vnd.github+json")
-                    .header("User-Agent", "OwnTV")
+                    .header("User-Agent", USER_AGENT)
                     .build()
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) throw CheckHttpException(resp.code)
@@ -126,8 +124,8 @@ class UpdateManager(
         scope.launch {
             runCatching {
                 val dir = File(context.filesDir, "updates").apply { mkdirs() }
-                val out = File(dir, "owntv-update.apk")
-                val request = Request.Builder().url(info.apkUrl).header("User-Agent", "OwnTV").build()
+                val out = File(dir, "greatwhite-tv-update.apk")
+                val request = Request.Builder().url(info.apkUrl).header("User-Agent", USER_AGENT).build()
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) throw DownloadHttpException(resp.code)
                     val body = resp.body
@@ -199,7 +197,8 @@ class UpdateManager(
     private class InstallException(cause: Throwable) : IOException(cause)
 
     companion object {
-        private const val TAG = "UpdateManager"
-        const val REPO = "ahXN00/OwnTV"
+        private const val TAG = "GreatWhiteUpdate"
+        private const val USER_AGENT = "GreatWhiteStreamsTV"
+        const val REPO = "boberthegr8/GreatWhiteTV-Own"
     }
 }
