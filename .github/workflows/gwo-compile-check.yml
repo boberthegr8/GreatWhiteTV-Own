@@ -36,28 +36,48 @@ jobs:
         run: |
           set -o pipefail
           ./gradlew :app:compileStandardDebugKotlin -x verifyI18nLiterals 2>&1 | tee "$RUNNER_TEMP/compile.log"
-      - name: Record result
+      - name: Build optimized Online release
+        id: package
+        if: steps.compile.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleStandardRelease -x verifyI18nLiterals 2>&1 | tee "$RUNNER_TEMP/package.log"
+      - name: Upload optimized APK
+        if: steps.package.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: GreatWhiteOnline-fast-release
+          path: app/build/outputs/apk/standard/release/*.apk
+          if-no-files-found: error
+      - name: Record result and run id
         if: always()
         env:
           PREP: ${{ steps.prep.outcome }}
           COMPILE: ${{ steps.compile.outcome }}
+          PACKAGE: ${{ steps.package.outcome }}
         shell: bash
         run: |
           mkdir -p ci
           {
+            echo "run=$GITHUB_RUN_ID"
             echo "commit=$GITHUB_SHA"
             echo "prep=$PREP"
             echo "compile=$COMPILE"
-            [[ -f "$RUNNER_TEMP/compile.log" ]] && tail -n 100 "$RUNNER_TEMP/compile.log"
+            echo "package=$PACKAGE"
+            [[ -f "$RUNNER_TEMP/compile.log" ]] && tail -n 50 "$RUNNER_TEMP/compile.log"
+            [[ -f "$RUNNER_TEMP/package.log" ]] && tail -n 80 "$RUNNER_TEMP/package.log"
           } > ci/online-compile-status.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add ci/online-compile-status.txt
-          git commit -m "CI: record Online compile status [skip ci]" || exit 0
+          git commit -m "CI: record Online compile/package status [skip ci]" || exit 0
           git push origin HEAD:greatwhite-online
-      - name: Fail when compile failed
+      - name: Fail when compile or package failed
         if: always()
         env:
           PREP: ${{ steps.prep.outcome }}
           COMPILE: ${{ steps.compile.outcome }}
-        run: '[[ "$PREP" == "success" && "$COMPILE" == "success" ]]'
+          PACKAGE: ${{ steps.package.outcome }}
+        run: '[[ "$PREP" == "success" && "$COMPILE" == "success" && "$PACKAGE" == "success" ]]'
