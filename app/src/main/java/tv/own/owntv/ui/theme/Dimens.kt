@@ -18,11 +18,14 @@ object Dimens {
     // Layer 2 — category rail (expands to show full names when it holds focus)
     val RailWidth = 92.dp
     val RailWidthExpanded = 325.dp // expanded (focused overlay) width — fits long category names
-    val RailWidthFixed = 272.dp    // Phase 2: fixed full-label category column (names wrap to 2 lines)
+    // Great White TV default: compact full-label category column. The previous 272dp rail consumed
+    // too much of a 16:9 TV screen and squeezed the live preview / metadata pane. 180dp matches the
+    // approved Great White layout while still allowing category names to wrap to two lines.
+    val RailWidthFixed = 180.dp
     val RailPillSize = 56.dp
-    val ChannelListWidth = 460.dp  // Phase 2: fixed channel-list column (Live); preview/detail fills the rest.
-    // Widened from 400dp so each row can also show the current programme (EPG) on a second line — the
-    // preview pane (Modifier.weight(1f)) narrows in step, so no other layout value needs to change.
+    // Keep the Live/EPG list readable while giving the preview pane a little more room. Together with
+    // the narrower category rail this places the two browse dividers at the approved Great White marks.
+    val ChannelListWidth = 450.dp
 
     // MD3 settings tonal icon tile
     val IconTileSize = 42.dp
