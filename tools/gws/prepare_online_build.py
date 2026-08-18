@@ -74,6 +74,17 @@ replace_once(
     '''                        selectedSection == MainSection.DOWNLOADS -> DownloadsScreen(
                             onFullscreen = { openFullscreen() },''',
     '''                        selectedSection == MainSection.ONLINE -> OnlineScreen(
+                            onPlayDirect = { item, episode, url ->
+                                val displayTitle = episode?.let { "${item.name} · ${it.title}" } ?: item.name
+                                player.play(
+                                    url,
+                                    title = displayTitle,
+                                    year = item.year,
+                                    isLive = false,
+                                    contentKey = "ONLINE:${item.type}:${episode?.id ?: item.id}",
+                                )
+                                openFullscreen(MainSection.ONLINE)
+                            },
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -116,4 +127,6 @@ print("  app name: Great White Online")
 print("  deep link scheme: greatwhiteonline://")
 print("  IPTV features: preserved from Great White Streams TV")
 print("  Online destination: enabled")
-print("  Online provider foundation: Stremio-compatible")
+print("  Online search + episodes: enabled")
+print("  Online source manager: enabled")
+print("  Direct HTTP playback: OwnTV player")
