@@ -28,27 +28,37 @@ subprocess.run([sys.executable, str(ROOT / "tools/gws/prepare_build.py")], cwd=R
 
 # AGP 9 / this Compose version exposes RowScope/ColumnScope.weight in a way that resolves to an
 # internal parent-data symbol from this standalone source file. Keep the Online screen TV layout
-# deterministic without depending on that extension: fixed parent-width fractions are sufficient
-# for the header and the two-pane catalog/details layout.
+# deterministic without depending on that extension: parent-width fractions are sufficient for
+# the header, the catalog/details split, and the source-manager row.
+online_screen = "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt"
+replace_once(online_screen, "import androidx.compose.foundation.layout.weight\n", "")
 replace_once(
-    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
-    "import androidx.compose.foundation.layout.weight\n",
-    "",
+    online_screen,
+    '''        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.online_title),''',
+    '''        ) {
+            Column(Modifier.fillMaxWidth(0.46f)) {
+                Text(
+                    text = stringResource(R.string.online_title),''',
 )
 replace_once(
-    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
-    "            Column(Modifier.weight(1f)) {",
-    "            Column(Modifier.fillMaxWidth(0.46f)) {",
-)
-replace_once(
-    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
+    online_screen,
     "                            modifier = Modifier.weight(0.9f).fillMaxHeight(),",
     "                            modifier = Modifier.fillMaxWidth(0.40f).fillMaxHeight(),",
 )
 replace_once(
-    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
+    online_screen,
     "                            modifier = Modifier.weight(1.25f).fillMaxHeight(),",
     "                            modifier = Modifier.fillMaxWidth(0.58f).fillMaxHeight(),",
+)
+replace_once(
+    online_screen,
+    '''                    Column(Modifier.weight(1f)) {
+                        Text(addon.name,''',
+    '''                    Column(Modifier.fillMaxWidth(0.72f)) {
+                        Text(addon.name,''',
 )
 
 # --- Standalone app identity ---------------------------------------------------------------
