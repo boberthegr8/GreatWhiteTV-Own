@@ -1,0 +1,87 @@
+commit=fccaf574d65fae639b41b5a4ec7ec6c9dd58cc33
+prep=success
+validate=success
+unit=failure
+debug=skipped
+release=skipped
+publish=skipped
+
+===== online-prep.log =====
+Great White build customizations applied:
+  applicationId: com.greatwhitestreams.tv
+  app name: Great White Streams TV
+  QR/mobile presets: HUSH + CCTV + Custom
+  HUSH default: http://hush.iptv:80
+  CCTV default: http://cvapp.tv:8000
+  source Edit action: Change DNS / Edit
+Great White Online build customizations applied:
+  applicationId: com.greatwhitestreams.online
+  app name: Great White Online
+  deep link scheme: greatwhiteonline://
+  IPTV features: preserved from Great White Streams TV
+  Online destination: enabled
+  Online provider foundation: Stremio-compatible
+
+===== online-unit.log =====
+Downloading https://services.gradle.org/distributions/gradle-9.7.0-bin.zip
+..............10%..............20%...............30%..............40%..............50%...............60%..............70%..............80%...............90%..............100%
+
+Welcome to Gradle 9.7.0!
+
+Here are the highlights of this release:
+ - Isolated Projects graduates to incubating
+ - Broader Configuration Cache compatibility
+ - More source locations in problem reports
+
+For more details see https://docs.gradle.org/9.7.0/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :app:testStandardDebugUnitTest
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardDebugBuild UP-TO-DATE
+> Task :app:preStandardDebugUnitTestBuild UP-TO-DATE
+> Task :app:generateStandardDebugResources
+> Task :app:generateStandardDebugBuildConfig
+> Task :app:javaPreCompileStandardDebug
+> Task :app:mapStandardDebugSourceSetPaths
+> Task :app:packageStandardDebugResources
+> Task :app:createStandardDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksStandardDebug
+> Task :app:processStandardDebugNavigationResources
+> Task :app:checkStandardDebugAarMetadata
+> Task :app:compileStandardDebugNavigationResources
+> Task :app:javaPreCompileStandardDebugUnitTest
+> Task :app:processStandardDebugMainManifest
+> Task :app:processStandardDebugManifest
+> Task :app:processStandardDebugManifestForPackage
+> Task :app:parseStandardDebugLocalResources
+> Task :app:generateStandardDebugRFile
+> Task :app:mergeStandardDebugResources
+> Task :app:processStandardDebugResources
+> Task :app:kspStandardDebugKotlin
+> Task :app:compileStandardDebugKotlin
+e: file:///home/runner/work/GreatWhiteTV-Own/GreatWhiteTV-Own/app/src/main/java/tv/own/owntv/features/update/UpdateFailureText.kt:9:74 'when' expression must be exhaustive. Add the 'DigestMismatch' branch or an 'else' branch.
+e: file:///home/runner/work/GreatWhiteTV-Own/GreatWhiteTV-Own/app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt:54:9 'when' expression must be exhaustive. Add the 'ONLINE' branch or an 'else' branch.
+
+> Task :app:compileStandardDebugKotlin FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileStandardDebugKotlin' (registered by plugin 'com.android.internal.application').
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2m 50s
+20 actionable tasks: 20 executed
+Configuration cache entry stored.
+
+===== online-validate.log =====
+standalone identity validation passed
+
