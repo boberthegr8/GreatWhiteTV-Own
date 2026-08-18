@@ -1,0 +1,46 @@
+name: Package Great White Online Now
+
+on:
+  push:
+    branches: ["greatwhite-online"]
+    paths:
+      - ".github/workflows/gwo-package-now.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_NAME: "1.0.0"
+      VERSION_CODE: "10000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+      - run: chmod +x gradlew
+      - name: Apply Online build transform
+        run: python3 tools/gws/prepare_online_build.py
+      - name: Build optimized arm release
+        run: ./gradlew :app:assembleStandardRelease -x verifyI18nLiterals
+      - name: Upload optimized APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GreatWhiteOnline-package-now
+          path: app/build/outputs/apk/standard/release/*.apk
+          if-no-files-found: error
+      - name: Record package run id
+        shell: bash
+        run: |
+          mkdir -p ci
+          echo "$GITHUB_RUN_ID" > ci/online-package-run-id.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci/online-package-run-id.txt
+          git commit -m "CI: record Online package run [skip ci]" || exit 0
+          git push origin HEAD:greatwhite-online
