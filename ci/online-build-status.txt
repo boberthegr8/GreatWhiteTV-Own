@@ -1,10 +1,61 @@
-commit=f31cb9e94e5182bd6d709ecbf809028656d64940
-prep=failure
-validate=skipped
-unit=skipped
-debug=skipped
-release=skipped
-publish=skipped
+commit=1db96659950be292c53abc15ee5ee384abe4734f
+prep=success
+validate=success
+unit=success
+debug=success
+release=success
+publish=success
+
+===== online-debug.log =====
+Calculating task graph as no cached configuration is available for tasks: :app:assembleStandardDebug
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardDebugBuild UP-TO-DATE
+> Task :app:generateStandardDebugAssets UP-TO-DATE
+> Task :app:mergeStandardDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateStandardDebugBuildConfig UP-TO-DATE
+> Task :app:generateStandardDebugResources UP-TO-DATE
+> Task :app:processStandardDebugNavigationResources UP-TO-DATE
+> Task :app:javaPreCompileStandardDebug UP-TO-DATE
+> Task :app:packageStandardDebugResources UP-TO-DATE
+> Task :app:parseStandardDebugLocalResources UP-TO-DATE
+> Task :app:generateStandardDebugRFile UP-TO-DATE
+> Task :app:kspStandardDebugKotlin UP-TO-DATE
+> Task :app:compileStandardDebugKotlin UP-TO-DATE
+> Task :app:compileStandardDebugJavaWithJavac UP-TO-DATE
+> Task :app:desugarStandardDebugFileDependencies
+> Task :app:checkStandardDebugAarMetadata UP-TO-DATE
+> Task :app:mapStandardDebugSourceSetPaths UP-TO-DATE
+> Task :app:compileStandardDebugNavigationResources UP-TO-DATE
+> Task :app:mergeStandardDebugResources UP-TO-DATE
+> Task :app:createStandardDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksStandardDebug UP-TO-DATE
+> Task :app:mergeStandardDebugAssets
+> Task :app:processStandardDebugMainManifest UP-TO-DATE
+> Task :app:processStandardDebugManifest UP-TO-DATE
+> Task :app:processStandardDebugManifestForPackage UP-TO-DATE
+> Task :app:compressStandardDebugAssets
+> Task :app:processStandardDebugResources UP-TO-DATE
+> Task :app:processStandardDebugJavaRes UP-TO-DATE
+> Task :app:checkStandardDebugDuplicateClasses
+> Task :app:mergeStandardDebugJavaResource
+> Task :app:generateStandardDebugGlobalSynthetics
+> Task :app:mergeLibDexStandardDebug
+> Task :app:mergeStandardDebugJniLibFolders
+> Task :app:validateSigningStandardDebug
+> Task :app:writeStandardDebugAppMetadata
+> Task :app:writeStandardDebugSigningConfigVersions
+> Task :app:mergeStandardDebugNativeLibs
+> Task :app:stripStandardDebugDebugSymbols
+> Task :app:mergeExtDexStandardDebug
+> Task :app:dexBuilderStandardDebug
+> Task :app:mergeProjectDexStandardDebug
+> Task :app:packageStandardDebug
+> Task :app:assembleStandardDebug
+> Task :app:createStandardDebugApkListingFileRedirect
+
+BUILD SUCCESSFUL in 44s
+39 actionable tasks: 18 executed, 21 up-to-date
+Configuration cache entry stored.
 
 ===== online-prep.log =====
 Great White build customizations applied:
@@ -14,5 +65,131 @@ Great White build customizations applied:
   HUSH default: http://hush.iptv:80
   CCTV default: http://cvapp.tv:8000
   source Edit action: Change DNS / Edit
-Expected exactly one match in 'app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt', found 2: '            Column(Modifier.weight(1f)) {'
+Great White Online build customizations applied:
+  applicationId: com.greatwhitestreams.online
+  app name: Great White Online
+  deep link scheme: greatwhiteonline://
+  IPTV features: preserved from Great White Streams TV
+  Online destination: enabled
+  Online search + episodes: enabled
+  Online source manager: enabled
+  Direct HTTP playback: OwnTV player
+  updater: isolated from Great White TV shared release channel
+
+===== online-release.log =====
+Calculating task graph as no cached configuration is available for tasks: :app:assembleStandardRelease
+> Task :app:generateStandardReleaseAssets UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardReleaseBuild UP-TO-DATE
+> Task :app:generateStandardReleaseBuildConfig
+> Task :app:generateStandardReleaseResources
+> Task :app:mergeStandardReleaseJniLibFolders
+> Task :app:processStandardReleaseNavigationResources
+> Task :app:checkStandardReleaseDuplicateClasses
+> Task :app:javaPreCompileStandardRelease
+> Task :app:checkStandardReleaseAarMetadata
+> Task :app:mapStandardReleaseSourceSetPaths
+> Task :app:compileStandardReleaseNavigationResources
+> Task :app:mergeStandardReleaseNativeLibs
+> Task :app:stripStandardReleaseDebugSymbols
+> Task :app:mergeStandardReleaseArtProfile
+> Task :app:createStandardReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksStandardRelease
+> Task :app:extractStandardReleaseNativeSymbolTables
+> Task :app:mergeStandardReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:processStandardReleaseMainManifest
+> Task :app:processStandardReleaseManifest
+> Task :app:extractProguardFiles
+> Task :app:processStandardReleaseManifestForPackage
+> Task :app:mergeStandardReleaseStartupProfile
+> Task :app:mergeStandardReleaseAssets
+> Task :app:compressStandardReleaseAssets
+> Task :app:extractStandardReleaseVersionControlInfo
+> Task :app:writeStandardReleaseAppMetadata
+> Task :app:writeStandardReleaseSigningConfigVersions
+> Task :app:collectStandardReleaseDependencies
+> Task :app:packageStandardReleaseResources
+> Task :app:sdkStandardReleaseDependencyData
+> Task :app:parseStandardReleaseLocalResources
+> Task :app:generateStandardReleaseRFile
+> Task :app:mergeStandardReleaseResources
+> Task :app:processStandardReleaseResources
+> Task :app:kspStandardReleaseKotlin
+> Task :app:compileStandardReleaseKotlin
+> Task :app:processStandardReleaseJavaRes
+> Task :app:compileStandardReleaseJavaWithJavac
+> Task :app:mergeStandardReleaseGeneratedProguardFiles
+> Task :app:mergeStandardReleaseJavaResource
+> Task :app:generateStandardReleaseLintVitalReportModel
+> Task :app:expandStandardReleaseArtProfileWildcards
+> Task :app:produceStandardReleaseComposeMapping
+> Task :app:reportStandardReleaseComposeMappingErrors
+> Task :app:lintVitalAnalyzeStandardRelease
+> Task :app:minifyStandardReleaseWithR8
+> Task :app:lintVitalReportStandardRelease
+> Task :app:lintVitalStandardRelease
+> Task :app:convertShrunkResourcesToBinaryStandardRelease
+> Task :app:optimizeStandardReleaseResources
+> Task :app:mergeStandardReleaseComposeMapping
+> Task :app:compileStandardReleaseArtProfile
+> Task :app:packageStandardRelease
+> Task :app:assembleStandardRelease
+> Task :app:createStandardReleaseApkListingFileRedirect
+
+BUILD SUCCESSFUL in 4m 16s
+52 actionable tasks: 52 executed
+Configuration cache entry stored.
+
+===== online-unit.log =====
+
+Welcome to Gradle 9.7.0!
+
+Here are the highlights of this release:
+ - Isolated Projects graduates to incubating
+ - Broader Configuration Cache compatibility
+ - More source locations in problem reports
+
+For more details see https://docs.gradle.org/9.7.0/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :app:testStandardDebugUnitTest
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardDebugUnitTestBuild UP-TO-DATE
+> Task :app:preStandardDebugBuild UP-TO-DATE
+> Task :app:generateStandardDebugBuildConfig
+> Task :app:generateStandardDebugResources
+> Task :app:javaPreCompileStandardDebug
+> Task :app:mapStandardDebugSourceSetPaths
+> Task :app:processStandardDebugNavigationResources
+> Task :app:checkStandardDebugAarMetadata
+> Task :app:compileStandardDebugNavigationResources
+> Task :app:createStandardDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksStandardDebug
+> Task :app:javaPreCompileStandardDebugUnitTest
+> Task :app:processStandardDebugMainManifest
+> Task :app:processStandardDebugManifest
+> Task :app:processStandardDebugManifestForPackage
+> Task :app:packageStandardDebugResources
+> Task :app:parseStandardDebugLocalResources
+> Task :app:mergeStandardDebugResources
+> Task :app:generateStandardDebugRFile
+> Task :app:processStandardDebugResources
+> Task :app:kspStandardDebugKotlin
+> Task :app:compileStandardDebugKotlin
+> Task :app:processStandardDebugJavaRes
+> Task :app:compileStandardDebugJavaWithJavac
+> Task :app:bundleStandardDebugClassesToRuntimeJar
+> Task :app:bundleStandardDebugClassesToCompileJar
+> Task :app:kspStandardDebugUnitTestKotlin
+> Task :app:compileStandardDebugUnitTestKotlin
+> Task :app:compileStandardDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processStandardDebugUnitTestJavaRes
+> Task :app:testStandardDebugUnitTest
+
+BUILD SUCCESSFUL in 2m 14s
+28 actionable tasks: 28 executed
+Configuration cache entry stored.
+
+===== online-validate.log =====
+standalone identity validation passed
 
