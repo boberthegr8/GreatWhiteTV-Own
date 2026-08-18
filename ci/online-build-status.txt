@@ -1,10 +1,61 @@
-commit=fccaf574d65fae639b41b5a4ec7ec6c9dd58cc33
+commit=2fcabce56cba300edce4799d5fb9d41ae2f3ec2b
 prep=success
 validate=success
-unit=failure
-debug=skipped
-release=skipped
-publish=skipped
+unit=success
+debug=success
+release=success
+publish=success
+
+===== online-debug.log =====
+Calculating task graph as no cached configuration is available for tasks: :app:assembleStandardDebug
+> Task :app:preBuild UP-TO-DATE
+> Task :app:generateStandardDebugAssets UP-TO-DATE
+> Task :app:preStandardDebugBuild UP-TO-DATE
+> Task :app:mergeStandardDebugNativeDebugMetadata NO-SOURCE
+> Task :app:javaPreCompileStandardDebug UP-TO-DATE
+> Task :app:generateStandardDebugBuildConfig UP-TO-DATE
+> Task :app:generateStandardDebugResources UP-TO-DATE
+> Task :app:processStandardDebugNavigationResources UP-TO-DATE
+> Task :app:packageStandardDebugResources UP-TO-DATE
+> Task :app:parseStandardDebugLocalResources UP-TO-DATE
+> Task :app:generateStandardDebugRFile UP-TO-DATE
+> Task :app:kspStandardDebugKotlin UP-TO-DATE
+> Task :app:compileStandardDebugKotlin UP-TO-DATE
+> Task :app:compileStandardDebugJavaWithJavac UP-TO-DATE
+> Task :app:desugarStandardDebugFileDependencies
+> Task :app:checkStandardDebugAarMetadata UP-TO-DATE
+> Task :app:mapStandardDebugSourceSetPaths UP-TO-DATE
+> Task :app:compileStandardDebugNavigationResources UP-TO-DATE
+> Task :app:mergeStandardDebugResources UP-TO-DATE
+> Task :app:createStandardDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksStandardDebug UP-TO-DATE
+> Task :app:processStandardDebugMainManifest UP-TO-DATE
+> Task :app:processStandardDebugManifest UP-TO-DATE
+> Task :app:processStandardDebugManifestForPackage UP-TO-DATE
+> Task :app:processStandardDebugResources UP-TO-DATE
+> Task :app:mergeStandardDebugAssets
+> Task :app:compressStandardDebugAssets
+> Task :app:processStandardDebugJavaRes UP-TO-DATE
+> Task :app:checkStandardDebugDuplicateClasses
+> Task :app:generateStandardDebugGlobalSynthetics
+> Task :app:mergeStandardDebugJavaResource
+> Task :app:mergeStandardDebugJniLibFolders
+> Task :app:mergeLibDexStandardDebug
+> Task :app:mergeStandardDebugNativeLibs
+> Task :app:validateSigningStandardDebug
+> Task :app:writeStandardDebugAppMetadata
+> Task :app:writeStandardDebugSigningConfigVersions
+> Task :app:stripStandardDebugDebugSymbols
+> Task :app:dexBuilderStandardDebug
+> Task :app:mergeExtDexStandardDebug
+> Task :app:mergeProjectDexStandardDebug
+> Task :app:packageStandardDebug
+> Task :app:assembleStandardDebug
+> Task :app:createStandardDebugApkListingFileRedirect
+
+BUILD SUCCESSFUL in 1m 34s
+39 actionable tasks: 18 executed, 21 up-to-date
+Configuration cache entry stored.
 
 ===== online-prep.log =====
 Great White build customizations applied:
@@ -21,6 +72,70 @@ Great White Online build customizations applied:
   IPTV features: preserved from Great White Streams TV
   Online destination: enabled
   Online provider foundation: Stremio-compatible
+
+===== online-release.log =====
+Calculating task graph as no cached configuration is available for tasks: :app:assembleStandardRelease
+> Task :app:generateStandardReleaseAssets UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardReleaseBuild UP-TO-DATE
+> Task :app:generateStandardReleaseBuildConfig
+> Task :app:mergeStandardReleaseJniLibFolders
+> Task :app:extractProguardFiles
+> Task :app:generateStandardReleaseResources
+> Task :app:processStandardReleaseNavigationResources
+> Task :app:javaPreCompileStandardRelease
+> Task :app:checkStandardReleaseDuplicateClasses
+> Task :app:mergeStandardReleaseNativeLibs
+> Task :app:checkStandardReleaseAarMetadata
+> Task :app:mapStandardReleaseSourceSetPaths
+> Task :app:compileStandardReleaseNavigationResources
+> Task :app:stripStandardReleaseDebugSymbols
+> Task :app:mergeStandardReleaseArtProfile
+> Task :app:createStandardReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksStandardRelease
+> Task :app:extractStandardReleaseNativeSymbolTables
+> Task :app:mergeStandardReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:mergeStandardReleaseStartupProfile
+> Task :app:mergeStandardReleaseAssets
+> Task :app:compressStandardReleaseAssets
+> Task :app:processStandardReleaseMainManifest
+> Task :app:processStandardReleaseManifest
+> Task :app:processStandardReleaseManifestForPackage
+> Task :app:extractStandardReleaseVersionControlInfo
+> Task :app:writeStandardReleaseAppMetadata
+> Task :app:writeStandardReleaseSigningConfigVersions
+> Task :app:collectStandardReleaseDependencies
+> Task :app:sdkStandardReleaseDependencyData
+> Task :app:packageStandardReleaseResources
+> Task :app:parseStandardReleaseLocalResources
+> Task :app:generateStandardReleaseRFile
+> Task :app:mergeStandardReleaseResources
+> Task :app:processStandardReleaseResources
+> Task :app:kspStandardReleaseKotlin
+> Task :app:compileStandardReleaseKotlin
+> Task :app:processStandardReleaseJavaRes
+> Task :app:mergeStandardReleaseJavaResource
+> Task :app:compileStandardReleaseJavaWithJavac
+> Task :app:mergeStandardReleaseGeneratedProguardFiles
+> Task :app:expandStandardReleaseArtProfileWildcards
+> Task :app:generateStandardReleaseLintVitalReportModel
+> Task :app:produceStandardReleaseComposeMapping
+> Task :app:reportStandardReleaseComposeMappingErrors
+> Task :app:lintVitalAnalyzeStandardRelease
+> Task :app:minifyStandardReleaseWithR8
+> Task :app:lintVitalReportStandardRelease
+> Task :app:lintVitalStandardRelease
+> Task :app:convertShrunkResourcesToBinaryStandardRelease
+> Task :app:optimizeStandardReleaseResources
+> Task :app:mergeStandardReleaseComposeMapping
+> Task :app:compileStandardReleaseArtProfile
+> Task :app:packageStandardRelease
+> Task :app:assembleStandardRelease
+> Task :app:createStandardReleaseApkListingFileRedirect
+
+BUILD SUCCESSFUL in 5m 7s
+52 actionable tasks: 52 executed
+Configuration cache entry stored.
 
 ===== online-unit.log =====
 Downloading https://services.gradle.org/distributions/gradle-9.7.0-bin.zip
@@ -39,9 +154,8 @@ Starting a Gradle Daemon (subsequent builds will be faster)
 Calculating task graph as no cached configuration is available for tasks: :app:testStandardDebugUnitTest
 > Task :app:preBuild UP-TO-DATE
 > Task :app:preStandardDebugBuild UP-TO-DATE
-> Task :app:preStandardDebugUnitTestBuild UP-TO-DATE
-> Task :app:generateStandardDebugResources
 > Task :app:generateStandardDebugBuildConfig
+> Task :app:generateStandardDebugResources
 > Task :app:javaPreCompileStandardDebug
 > Task :app:mapStandardDebugSourceSetPaths
 > Task :app:packageStandardDebugResources
@@ -50,6 +164,7 @@ Calculating task graph as no cached configuration is available for tasks: :app:t
 > Task :app:processStandardDebugNavigationResources
 > Task :app:checkStandardDebugAarMetadata
 > Task :app:compileStandardDebugNavigationResources
+> Task :app:preStandardDebugUnitTestBuild UP-TO-DATE
 > Task :app:javaPreCompileStandardDebugUnitTest
 > Task :app:processStandardDebugMainManifest
 > Task :app:processStandardDebugManifest
@@ -60,26 +175,18 @@ Calculating task graph as no cached configuration is available for tasks: :app:t
 > Task :app:processStandardDebugResources
 > Task :app:kspStandardDebugKotlin
 > Task :app:compileStandardDebugKotlin
-e: file:///home/runner/work/GreatWhiteTV-Own/GreatWhiteTV-Own/app/src/main/java/tv/own/owntv/features/update/UpdateFailureText.kt:9:74 'when' expression must be exhaustive. Add the 'DigestMismatch' branch or an 'else' branch.
-e: file:///home/runner/work/GreatWhiteTV-Own/GreatWhiteTV-Own/app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt:54:9 'when' expression must be exhaustive. Add the 'ONLINE' branch or an 'else' branch.
+> Task :app:processStandardDebugJavaRes
+> Task :app:compileStandardDebugJavaWithJavac
+> Task :app:bundleStandardDebugClassesToCompileJar
+> Task :app:bundleStandardDebugClassesToRuntimeJar
+> Task :app:kspStandardDebugUnitTestKotlin
+> Task :app:compileStandardDebugUnitTestKotlin
+> Task :app:compileStandardDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processStandardDebugUnitTestJavaRes
+> Task :app:testStandardDebugUnitTest
 
-> Task :app:compileStandardDebugKotlin FAILED
-
-FAILURE: Build failed with an exception.
-
-* What went wrong:
-Execution failed for task ':app:compileStandardDebugKotlin' (registered by plugin 'com.android.internal.application').
-> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
-   > Compilation error. See log for more details
-
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights from a Build Scan (powered by Develocity).
-> Get more help at https://help.gradle.org.
-
-BUILD FAILED in 2m 50s
-20 actionable tasks: 20 executed
+BUILD SUCCESSFUL in 4m 8s
+28 actionable tasks: 28 executed
 Configuration cache entry stored.
 
 ===== online-validate.log =====
