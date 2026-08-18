@@ -44,3 +44,5 @@ jobs:
           git add ci/online-package-run-id.txt
           git commit -m "CI: record Online package run [skip ci]" || exit 0
           git push origin HEAD:greatwhite-online
+
+# Manual package trigger refreshed after Online Compose layout fix.
