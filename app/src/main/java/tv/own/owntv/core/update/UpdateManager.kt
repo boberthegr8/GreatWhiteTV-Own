@@ -17,17 +17,19 @@ import org.json.JSONObject
 import tv.own.owntv.BuildConfig
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 
-/**
- * In-app updates straight from GitHub Releases: checks the Great White Streams TV fork's latest
- * release, compares its tag with the installed version, downloads the release APK, and hands it to
- * the system installer. Releases carry one APK per ABI so the updater never installs the wrong build.
- */
+/** Great White Online's independent, SHA-256 verified update channel. */
 class UpdateManager(
     private val context: Context,
     private val client: OkHttpClient,
 ) {
-    data class UpdateInfo(val version: String, val notes: String, val apkUrl: String)
+    data class UpdateInfo(
+        val version: String,
+        val notes: String,
+        val apkUrl: String,
+        val sha256: String = "",
+    )
 
     sealed interface Failure {
         data class CheckHttp(val code: Int) : Failure
@@ -36,6 +38,7 @@ class UpdateManager(
         data object CheckNetwork : Failure
         data class DownloadHttp(val code: Int) : Failure
         data object EmptyDownload : Failure
+        data object DigestMismatch : Failure
         data object DownloadNetwork : Failure
         data object Install : Failure
     }
@@ -50,109 +53,119 @@ class UpdateManager(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
 
     private class CheckHttpException(val code: Int) : IOException()
     private class DownloadHttpException(val code: Int) : IOException()
-    private class NoCompatibleApkException : IOException()
     private class InvalidReleaseResponseException : IOException()
     private class EmptyDownloadException : IOException()
+    private class DigestMismatchException : IOException()
+    private class InstallException(cause: Throwable) : IOException(cause)
 
     private fun failureFor(error: Throwable, checking: Boolean): Failure = when (error) {
         is CheckHttpException -> Failure.CheckHttp(error.code)
         is DownloadHttpException -> Failure.DownloadHttp(error.code)
-        is NoCompatibleApkException -> Failure.NoCompatibleApk
         is InvalidReleaseResponseException -> Failure.InvalidReleaseResponse
         is EmptyDownloadException -> Failure.EmptyDownload
+        is DigestMismatchException -> Failure.DigestMismatch
         else -> if (checking) Failure.CheckNetwork else Failure.DownloadNetwork
     }
 
     val currentVersion: String = BuildConfig.VERSION_NAME
 
-    /** Queries GitHub's latest release; moves to Available / UpToDate / a semantic failure. */
+    /** Reads only the Online feed, never the Great White Streams TV release channel. */
     fun check() {
         if (_state.value is State.Checking || _state.value is State.Downloading) return
         _state.value = State.Checking
         scope.launch {
             runCatching {
                 val request = Request.Builder()
-                    .url("https://api.github.com/repos/$REPO/releases/latest")
-                    .header("Accept", "application/vnd.github+json")
+                    .url(FEED_URL)
+                    .header("Accept", "application/json")
                     .header("User-Agent", USER_AGENT)
                     .build()
-                client.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) throw CheckHttpException(resp.code)
-                    val body = resp.body.string()
-                    if (body.isBlank()) throw InvalidReleaseResponseException()
-                    val o = runCatching { JSONObject(body) }.getOrElse { throw InvalidReleaseResponseException() }
-                    val version = o.optString("tag_name").removePrefix("v").takeIf { it.isNotBlank() }
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw CheckHttpException(response.code)
+                    val raw = response.body.string()
+                    if (raw.isBlank()) throw InvalidReleaseResponseException()
+                    val json = runCatching { JSONObject(raw) }.getOrElse { throw InvalidReleaseResponseException() }
+                    val version = json.optString("version").takeIf { it.isNotBlank() }
                         ?: throw InvalidReleaseResponseException()
-                    val notes = o.optString("body").take(16_000)
-                    val assets = o.optJSONArray("assets") ?: throw InvalidReleaseResponseException()
-                    // Releases carry one APK per ABI flavor (arm = generic, x86_64 suffixed). Never
-                    // silently install an APK for the wrong ABI.
-                    val wantX86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
-                    val apkUrl = (0 until assets.length())
-                        .asSequence()
-                        .mapNotNull { assets.optJSONObject(it) }
-                        .mapNotNull { asset ->
-                            val name = asset.optString("name")
-                            val url = asset.optString("browser_download_url")
-                            if (!name.endsWith(".apk") || url.isBlank()) return@mapNotNull null
-                            val isX86 = name.contains("x86_64", ignoreCase = true)
-                            if (isX86 == wantX86) url else null
-                        }
-                        .firstOrNull()
-                        ?: throw NoCompatibleApkException()
-                    val info = UpdateInfo(version, notes, apkUrl)
-                    if (isNewer(version, currentVersion)) _state.value = State.Available(info)
-                    else _state.value = State.UpToDate
+                    val x86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
+                    val apkUrl = json.optString(if (x86) "x86ApkUrl" else "apkUrl").takeIf { it.isNotBlank() }
+                        ?: throw InvalidReleaseResponseException()
+                    val sha256 = json.optString(if (x86) "x86Sha256" else "sha256").takeIf { it.isNotBlank() }
+                        ?: throw InvalidReleaseResponseException()
+                    val info = UpdateInfo(
+                        version = version,
+                        notes = json.optString("notes").take(16_000),
+                        apkUrl = apkUrl,
+                        sha256 = sha256.removePrefix("sha256:").lowercase(),
+                    )
+                    _state.value = if (isNewer(version, currentVersion)) State.Available(info) else State.UpToDate
                 }
             }.onFailure { error ->
-                Log.w(TAG, "update check failed: ${error.message}", error)
+                Log.w(TAG, "online update check failed: ${error.message}", error)
                 _state.value = State.Failed(failureFor(error, checking = true))
             }
         }
     }
 
-    /** Downloads the release APK with progress, then opens the system installer. */
     fun downloadAndInstall() {
         val info = (_state.value as? State.Available)?.info ?: return
         _state.value = State.Downloading(0)
         scope.launch {
             runCatching {
                 val dir = File(context.filesDir, "updates").apply { mkdirs() }
-                val out = File(dir, "greatwhite-tv-update.apk")
+                val out = File(dir, "greatwhite-online-update.apk")
                 val request = Request.Builder().url(info.apkUrl).header("User-Agent", USER_AGENT).build()
-                client.newCall(request).execute().use { resp ->
-                    if (!resp.isSuccessful) throw DownloadHttpException(resp.code)
-                    val body = resp.body
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw DownloadHttpException(response.code)
+                    val body = response.body
                     val total = body.contentLength()
                     var copied = 0L
                     body.byteStream().use { input ->
                         out.outputStream().use { output ->
-                            val buf = ByteArray(64 * 1024)
+                            val buffer = ByteArray(64 * 1024)
                             while (true) {
-                                val n = input.read(buf)
-                                if (n < 0) break
-                                output.write(buf, 0, n)
-                                copied += n
+                                val count = input.read(buffer)
+                                if (count < 0) break
+                                output.write(buffer, 0, count)
+                                copied += count
                                 if (total > 0) _state.value = State.Downloading((copied * 100 / total).toInt())
                             }
                         }
                     }
                     if (copied == 0L) throw EmptyDownloadException()
                 }
+                if (!digestMatches(out, info.sha256)) {
+                    out.delete()
+                    throw DigestMismatchException()
+                }
                 runCatching { install(out) }.getOrElse { throw InstallException(it) }
-                _state.value = State.Available(info) // dialog stays sane if the user cancels install
+                _state.value = State.Available(info)
             }.onFailure { error ->
-                Log.w(TAG, "update download failed: ${error.message}", error)
+                Log.w(TAG, "online update download failed: ${error.message}", error)
                 val failure = if (error is InstallException) Failure.Install else failureFor(error, checking = false)
                 _state.value = State.Failed(failure, retryInfo = info)
             }
         }
+    }
+
+    private fun digestMatches(file: File, expected: String): Boolean {
+        if (expected.length != 64) return false
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                digest.update(buffer, 0, count)
+            }
+        }
+        val actual = digest.digest().joinToString("") { "%02x".format(it) }
+        return actual.equals(expected, ignoreCase = true)
     }
 
     private fun install(apk: File) {
@@ -164,11 +177,10 @@ class UpdateManager(
         context.startActivity(intent)
     }
 
-    /** Retries the failed phase without losing a successfully resolved release asset. */
     fun retry() {
         val failed = _state.value as? State.Failed ?: return
         val info = failed.retryInfo
-        if (info != null && failed.failure !is Failure.CheckHttp && failed.failure !is Failure.NoCompatibleApk &&
+        if (info != null && failed.failure !is Failure.CheckHttp &&
             failed.failure !is Failure.InvalidReleaseResponse && failed.failure !is Failure.CheckNetwork
         ) {
             _state.value = State.Available(info)
@@ -182,7 +194,6 @@ class UpdateManager(
         if (_state.value !is State.Downloading) _state.value = State.Idle
     }
 
-    /** Numeric segment-wise compare: "1.10.0" > "1.9.3"; non-numeric junk compares as 0. */
     private fun isNewer(remote: String, local: String): Boolean {
         val r = remote.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
         val l = local.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
@@ -194,11 +205,10 @@ class UpdateManager(
         return false
     }
 
-    private class InstallException(cause: Throwable) : IOException(cause)
-
     companion object {
-        private const val TAG = "GreatWhiteUpdate"
-        private const val USER_AGENT = "GreatWhiteStreamsTV"
-        const val REPO = "boberthegr8/GreatWhiteTV-Own"
+        private const val TAG = "GreatWhiteOnlineUpdate"
+        private const val USER_AGENT = "GreatWhiteOnline"
+        private const val FEED_URL =
+            "https://raw.githubusercontent.com/boberthegr8/GreatWhiteTV-Own/greatwhite-online/auto/online-update.json"
     }
 }
