@@ -79,6 +79,22 @@ replace_once(
     'android:scheme="greatwhiteonline" />\n                <data\n                    android:host="open"\n                    android:scheme="greatwhiteonline" />',
 )
 
+# The regular Great White TV app and Online currently live in the same GitHub repository. The
+# inherited updater uses /releases/latest, which cannot distinguish products. Until Online gets its
+# dedicated release feed, report UpToDate instead of ever offering a TV APK to the Online package.
+# The permanent Online signing key still means future Online APKs install in-place over v1.0.0.
+replace_once(
+    "app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt",
+    '''    fun check() {
+        if (_state.value is State.Checking || _state.value is State.Downloading) return''',
+    '''    fun check() {
+        if (BuildConfig.APPLICATION_ID == "com.greatwhitestreams.online") {
+            _state.value = State.UpToDate
+            return
+        }
+        if (_state.value is State.Checking || _state.value is State.Downloading) return''',
+)
+
 # --- Navigation model ----------------------------------------------------------------------
 shell_vm = "app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt"
 replace_once(
@@ -165,3 +181,4 @@ print("  Online destination: enabled")
 print("  Online search + episodes: enabled")
 print("  Online source manager: enabled")
 print("  Direct HTTP playback: OwnTV player")
+print("  updater: isolated from Great White TV shared release channel")
