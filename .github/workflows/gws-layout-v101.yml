@@ -1,0 +1,46 @@
+name: Great White TV v1.0.1 Layout Build
+
+on:
+  pull_request:
+    branches: ["gws-v1"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_NAME: "1.0.1"
+      VERSION_CODE: "10001"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+
+      - name: Apply Great White identity
+        run: python3 tools/gws/prepare_build.py
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew :app:testStandardDebugUnitTest -x verifyI18nLiterals
+
+      - name: Build unsigned optimized ARM release
+        run: ./gradlew :app:assembleStandardRelease -x verifyI18nLiterals
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: GreatWhiteTV-v1.0.1-unsigned
+          path: app/build/outputs/apk/standard/release/*.apk
+          if-no-files-found: error
