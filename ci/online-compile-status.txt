@@ -1,6 +1,8 @@
-commit=2ac1953c7c71864433eb22d3794b09c1a5e41ea5
+run=32187330767
+commit=ee3dd8bed456b0d4feedbd9a8a45b8a9afaff174
 prep=success
 compile=success
+package=success
 
 Welcome to Gradle 9.7.0!
 
@@ -24,6 +26,68 @@ Calculating task graph as no cached configuration is available for tasks: :app:c
 > Task :app:kspStandardDebugKotlin
 > Task :app:compileStandardDebugKotlin
 
-BUILD SUCCESSFUL in 2m 37s
+BUILD SUCCESSFUL in 2m
 8 actionable tasks: 8 executed
+Configuration cache entry stored.
+Calculating task graph as no cached configuration is available for tasks: :app:assembleStandardRelease
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardReleaseBuild UP-TO-DATE
+> Task :app:generateStandardReleaseAssets UP-TO-DATE
+> Task :app:generateStandardReleaseBuildConfig
+> Task :app:generateStandardReleaseResources
+> Task :app:mergeStandardReleaseJniLibFolders
+> Task :app:processStandardReleaseNavigationResources
+> Task :app:javaPreCompileStandardRelease
+> Task :app:mergeStandardReleaseArtProfile
+> Task :app:checkStandardReleaseDuplicateClasses
+> Task :app:mapStandardReleaseSourceSetPaths
+> Task :app:compileStandardReleaseNavigationResources
+> Task :app:mergeStandardReleaseNativeLibs
+> Task :app:checkStandardReleaseAarMetadata
+> Task :app:createStandardReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksStandardRelease
+> Task :app:stripStandardReleaseDebugSymbols
+> Task :app:extractStandardReleaseNativeSymbolTables
+> Task :app:mergeStandardReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:extractProguardFiles
+> Task :app:packageStandardReleaseResources
+> Task :app:mergeStandardReleaseStartupProfile
+> Task :app:parseStandardReleaseLocalResources
+> Task :app:generateStandardReleaseRFile
+> Task :app:mergeStandardReleaseAssets
+> Task :app:compressStandardReleaseAssets
+> Task :app:processStandardReleaseMainManifest
+> Task :app:extractStandardReleaseVersionControlInfo
+> Task :app:processStandardReleaseManifest
+> Task :app:processStandardReleaseManifestForPackage
+> Task :app:writeStandardReleaseAppMetadata
+> Task :app:writeStandardReleaseSigningConfigVersions
+> Task :app:collectStandardReleaseDependencies
+> Task :app:sdkStandardReleaseDependencyData
+> Task :app:mergeStandardReleaseResources
+> Task :app:processStandardReleaseResources
+> Task :app:kspStandardReleaseKotlin
+> Task :app:compileStandardReleaseKotlin
+> Task :app:processStandardReleaseJavaRes
+> Task :app:mergeStandardReleaseJavaResource
+> Task :app:compileStandardReleaseJavaWithJavac
+> Task :app:mergeStandardReleaseGeneratedProguardFiles
+> Task :app:generateStandardReleaseLintVitalReportModel
+> Task :app:expandStandardReleaseArtProfileWildcards
+> Task :app:produceStandardReleaseComposeMapping
+> Task :app:reportStandardReleaseComposeMappingErrors
+> Task :app:lintVitalAnalyzeStandardRelease
+> Task :app:minifyStandardReleaseWithR8
+> Task :app:lintVitalReportStandardRelease
+> Task :app:lintVitalStandardRelease
+> Task :app:convertShrunkResourcesToBinaryStandardRelease
+> Task :app:optimizeStandardReleaseResources
+> Task :app:mergeStandardReleaseComposeMapping
+> Task :app:compileStandardReleaseArtProfile
+> Task :app:packageStandardRelease
+> Task :app:assembleStandardRelease
+> Task :app:createStandardReleaseApkListingFileRedirect
+
+BUILD SUCCESSFUL in 4m 1s
+52 actionable tasks: 52 executed
 Configuration cache entry stored.
