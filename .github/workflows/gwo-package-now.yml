@@ -5,6 +5,8 @@ on:
     branches: ["greatwhite-online"]
     paths:
       - ".github/workflows/gwo-package-now.yml"
+  pull_request:
+    branches: ["greatwhite-online"]
   workflow_dispatch:
 
 permissions:
@@ -35,6 +37,7 @@ jobs:
           path: app/build/outputs/apk/standard/release/*.apk
           if-no-files-found: error
       - name: Record package run id
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           mkdir -p ci
@@ -45,4 +48,4 @@ jobs:
           git commit -m "CI: record Online package run [skip ci]" || exit 0
           git push origin HEAD:greatwhite-online
 
-# Manual package trigger refreshed after Online Compose layout fix.
+# PR trigger exists so connected GitHub tooling can reliably request a clean package build.
