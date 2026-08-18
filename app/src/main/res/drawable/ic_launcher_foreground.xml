@@ -3,29 +3,33 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Great White Streams TV: TV frame + abstract white shark fin/wave. -->
+    <!-- Great White Online: TV frame + globe/stream mark, distinct from Great White Streams TV. -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#2DE2C4"
         android:strokeWidth="4"
         android:strokeLineJoin="round"
-        android:pathData="M26,28 L82,28 L82,70 L26,70 Z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#2DE2C4"
-        android:strokeWidth="4"
-        android:strokeLineCap="round"
-        android:pathData="M47,70 L43,78 M61,70 L65,78 M39,78 L69,78" />
-    <path
-        android:fillColor="#F2F6FA"
-        android:pathData="M37,63 L49,39 L56,54 L68,47 L75,63 Z" />
-    <path
-        android:fillColor="#0A0E14"
-        android:pathData="M34,59 C44,54 52,64 61,61 C68,59 72,54 78,55 L78,67 L34,67 Z" />
+        android:pathData="M25,27 L83,27 L83,71 L25,71 Z" />
     <path
         android:fillColor="#00000000"
         android:strokeColor="#2DE2C4"
         android:strokeWidth="3"
         android:strokeLineCap="round"
-        android:pathData="M35,60 C44,55 52,65 61,62 C68,60 72,55 77,56" />
+        android:pathData="M45,71 L42,79 M63,71 L66,79 M38,79 L70,79" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F2F6FA"
+        android:strokeWidth="3"
+        android:pathData="M54,35 A14,14 0,1 0,54,63 A14,14 0,1 0,54,35" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F2F6FA"
+        android:strokeWidth="2.5"
+        android:pathData="M40,49 L68,49 M54,35 C47,40 47,58 54,63 M54,35 C61,40 61,58 54,63" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#2DE2C4"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M35,65 C43,60 49,68 57,65 C64,63 69,59 75,61" />
 </vector>
