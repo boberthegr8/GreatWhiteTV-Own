@@ -26,12 +26,29 @@ def replace_once(path: str, old: str, new: str) -> None:
 # Fire TV launcher support, Great White colors and the stable package-separation strategy.
 subprocess.run([sys.executable, str(ROOT / "tools/gws/prepare_build.py")], cwd=ROOT, check=True)
 
-# This Compose version exposes RowScope/ColumnScope.weight as a member extension. An explicit import
-# resolves to an internal layout symbol and fails Kotlin compilation, so Online deliberately omits it.
+# AGP 9 / this Compose version exposes RowScope/ColumnScope.weight in a way that resolves to an
+# internal parent-data symbol from this standalone source file. Keep the Online screen TV layout
+# deterministic without depending on that extension: fixed parent-width fractions are sufficient
+# for the header and the two-pane catalog/details layout.
 replace_once(
     "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
     "import androidx.compose.foundation.layout.weight\n",
     "",
+)
+replace_once(
+    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
+    "            Column(Modifier.weight(1f)) {",
+    "            Column(Modifier.fillMaxWidth(0.46f)) {",
+)
+replace_once(
+    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
+    "                            modifier = Modifier.weight(0.9f).fillMaxHeight(),",
+    "                            modifier = Modifier.fillMaxWidth(0.40f).fillMaxHeight(),",
+)
+replace_once(
+    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
+    "                            modifier = Modifier.weight(1.25f).fillMaxHeight(),",
+    "                            modifier = Modifier.fillMaxWidth(0.58f).fillMaxHeight(),",
 )
 
 # --- Standalone app identity ---------------------------------------------------------------
