@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_nav_online">Online</string>
+    <string name="online_title">Great White Online</string>
+    <string name="online_subtitle">Online movies and series from configured add-ons</string>
+    <string name="online_loading">Loading online catalog…</string>
+    <string name="online_empty">No online titles were returned.</string>
+    <string name="online_error">Unable to load the online catalog.</string>
+    <string name="online_movies">Movies</string>
+    <string name="online_series">Series</string>
+    <string name="online_source_cinemeta">Cinemeta</string>
+    <string name="online_item_no_description">No description available.</string>
+    <string name="online_provider_foundation">Stremio-compatible provider</string>
+</resources>
