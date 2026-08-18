@@ -1,0 +1,63 @@
+name: Great White Online Fast Compile
+
+on:
+  push:
+    branches: ["greatwhite-online"]
+    paths-ignore:
+      - "ci/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_NAME: "1.0.0"
+      VERSION_CODE: "10000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+          cache: gradle
+      - run: chmod +x gradlew
+      - name: Apply Online transform
+        id: prep
+        continue-on-error: true
+        run: python3 tools/gws/prepare_online_build.py
+      - name: Compile Online Kotlin
+        id: compile
+        if: steps.prep.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:compileStandardDebugKotlin -x verifyI18nLiterals 2>&1 | tee "$RUNNER_TEMP/compile.log"
+      - name: Record result
+        if: always()
+        env:
+          PREP: ${{ steps.prep.outcome }}
+          COMPILE: ${{ steps.compile.outcome }}
+        shell: bash
+        run: |
+          mkdir -p ci
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "prep=$PREP"
+            echo "compile=$COMPILE"
+            [[ -f "$RUNNER_TEMP/compile.log" ]] && tail -n 100 "$RUNNER_TEMP/compile.log"
+          } > ci/online-compile-status.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci/online-compile-status.txt
+          git commit -m "CI: record Online compile status [skip ci]" || exit 0
+          git push origin HEAD:greatwhite-online
+      - name: Fail when compile failed
+        if: always()
+        env:
+          PREP: ${{ steps.prep.outcome }}
+          COMPILE: ${{ steps.compile.outcome }}
+        run: '[[ "$PREP" == "success" && "$COMPILE" == "success" ]]'
