@@ -1,0 +1,29 @@
+commit=e1d3d6419175720c017bed782a509aabbd9ee208
+prep=success
+compile=success
+
+Welcome to Gradle 9.7.0!
+
+Here are the highlights of this release:
+ - Isolated Projects graduates to incubating
+ - Broader Configuration Cache compatibility
+ - More source locations in problem reports
+
+For more details see https://docs.gradle.org/9.7.0/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+Calculating task graph as no cached configuration is available for tasks: :app:compileStandardDebugKotlin
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preStandardDebugBuild UP-TO-DATE
+> Task :app:generateStandardDebugResources
+> Task :app:generateStandardDebugBuildConfig
+> Task :app:processStandardDebugNavigationResources
+> Task :app:packageStandardDebugResources
+> Task :app:parseStandardDebugLocalResources
+> Task :app:generateStandardDebugRFile
+> Task :app:kspStandardDebugKotlin
+> Task :app:compileStandardDebugKotlin
+
+BUILD SUCCESSFUL in 2m 23s
+8 actionable tasks: 8 executed
+Configuration cache entry stored.
