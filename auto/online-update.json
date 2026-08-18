@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "versionCode": 10000,
+  "apkUrl": "https://github.com/boberthegr8/GreatWhiteTV-Own/releases/download/online-v1.0.0/GreatWhiteOnline-v1.0.0.apk",
+  "x86ApkUrl": "https://github.com/boberthegr8/GreatWhiteTV-Own/releases/download/online-v1.0.0/GreatWhiteOnline-x86_64-v1.0.0.apk",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "x86Sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "notes": "Great White Online v1.0.0"
+}
