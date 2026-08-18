@@ -11,4 +11,5 @@
     <string name="online_source_cinemeta">Cinemeta</string>
     <string name="online_item_no_description">No description available.</string>
     <string name="online_provider_foundation">Stremio-compatible provider</string>
+    <string name="online_update_digest_mismatch">The downloaded update failed its security check. Please try again.</string>
 </resources>
