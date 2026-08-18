@@ -3,10 +3,12 @@ name: Great White Online
 on:
   push:
     branches: ["greatwhite-online"]
+    paths-ignore:
+      - "ci/online-build-status.txt"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -26,44 +28,149 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Apply Great White Online identity and features
-        run: python3 tools/gws/prepare_online_build.py
-
-      - name: Validate standalone identity
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q 'applicationId = "com.greatwhitestreams.online"' app/build.gradle.kts
-          grep -q 'android:label="Great White Online"' app/src/main/AndroidManifest.xml
-          grep -q 'android:scheme="greatwhiteonline"' app/src/main/AndroidManifest.xml
-          grep -q 'ONLINE(tv.own.owntv.R.string.common_nav_online)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt
-          grep -q 'http://hush.iptv:80' app/src/main/java/tv/own/owntv/core/companion/CompanionHtml.kt
-          grep -q 'http://cvapp.tv:8000' app/src/main/java/tv/own/owntv/core/companion/CompanionHtml.kt
-          test -f app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt
-          test -f app/src/main/java/tv/own/owntv/features/online/StremioAddonClient.kt
-
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
+      - name: Apply Great White Online identity and features
+        id: prep
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/gws/prepare_online_build.py 2>&1 | tee "$RUNNER_TEMP/online-prep.log"
+
+      - name: Validate standalone identity
+        id: validate
+        if: steps.prep.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            grep -q 'applicationId = "com.greatwhitestreams.online"' app/build.gradle.kts
+            grep -q 'android:label="Great White Online"' app/src/main/AndroidManifest.xml
+            grep -q 'android:scheme="greatwhiteonline"' app/src/main/AndroidManifest.xml
+            grep -q 'ONLINE(tv.own.owntv.R.string.common_nav_online)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt
+            grep -q 'http://hush.iptv:80' app/src/main/java/tv/own/owntv/core/companion/CompanionHtml.kt
+            grep -q 'http://cvapp.tv:8000' app/src/main/java/tv/own/owntv/core/companion/CompanionHtml.kt
+            test -f app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt
+            test -f app/src/main/java/tv/own/owntv/features/online/StremioAddonClient.kt
+            echo "standalone identity validation passed"
+          } 2>&1 | tee "$RUNNER_TEMP/online-validate.log"
+
       - name: Run unit tests
-        run: ./gradlew :app:testStandardDebugUnitTest -x verifyI18nLiterals
+        id: unit
+        if: steps.prep.outcome == 'success' && steps.validate.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:testStandardDebugUnitTest -x verifyI18nLiterals 2>&1 | tee "$RUNNER_TEMP/online-unit.log"
 
       - name: Build Fire TV / Android TV test APK
-        run: ./gradlew :app:assembleStandardDebug -x verifyI18nLiterals
+        id: debug
+        if: steps.unit.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleStandardDebug -x verifyI18nLiterals 2>&1 | tee "$RUNNER_TEMP/online-debug.log"
+
+      - name: Build unsigned optimized release APK
+        id: release
+        if: steps.unit.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew :app:assembleStandardRelease -x verifyI18nLiterals 2>&1 | tee "$RUNNER_TEMP/online-release.log"
 
       - name: Upload test APK
+        if: steps.debug.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: GreatWhiteOnline-test
           path: app/build/outputs/apk/standard/debug/*.apk
           if-no-files-found: error
 
-      - name: Build unsigned optimized release APK
-        run: ./gradlew :app:assembleStandardRelease -x verifyI18nLiterals
-
       - name: Upload unsigned release APK
+        if: steps.release.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: GreatWhiteOnline-unsigned-release
           path: app/build/outputs/apk/standard/release/*.apk
           if-no-files-found: error
+
+      # A moving prerelease makes the compiled files retrievable without relying on Actions-run listing.
+      # It is development-only and is replaced on each successful Online build.
+      - name: Publish latest Online CI package
+        id: publish
+        if: steps.debug.outcome == 'success' && steps.release.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-package
+          DEBUG_APK="$(find app/build/outputs/apk/standard/debug -type f -name '*.apk' | head -1)"
+          RELEASE_APK="$(find app/build/outputs/apk/standard/release -type f -name '*.apk' | head -1)"
+          cp "$DEBUG_APK" ci-package/GreatWhiteOnline-v1.0.0-debug.apk
+          cp "$RELEASE_APK" ci-package/GreatWhiteOnline-v1.0.0-unsigned.apk
+          sha256sum ci-package/*.apk > ci-package/SHA256SUMS.txt
+          gh release delete online-ci-latest --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create online-ci-latest \
+            ci-package/GreatWhiteOnline-v1.0.0-debug.apk \
+            ci-package/GreatWhiteOnline-v1.0.0-unsigned.apk \
+            ci-package/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Great White Online CI latest" \
+            --notes "Automated development build. The debug APK is installable for testing; the unsigned optimized APK is for private permanent signing."
+
+      - name: Write build status back to branch
+        if: always()
+        env:
+          PREP: ${{ steps.prep.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          DEBUG: ${{ steps.debug.outcome }}
+          RELEASE: ${{ steps.release.outcome }}
+          PUBLISH: ${{ steps.publish.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "prep=$PREP"
+            echo "validate=$VALIDATE"
+            echo "unit=$UNIT"
+            echo "debug=$DEBUG"
+            echo "release=$RELEASE"
+            echo "publish=$PUBLISH"
+            echo
+            for f in "$RUNNER_TEMP"/online-*.log; do
+              [[ -f "$f" ]] || continue
+              echo "===== $(basename "$f") ====="
+              tail -n 120 "$f"
+              echo
+            done
+          } > ci/online-build-status.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ci/online-build-status.txt
+          git commit -m "CI: record Great White Online build status [skip ci]" || exit 0
+          git push origin HEAD:greatwhite-online
+
+      - name: Fail workflow when validation or build failed
+        if: always()
+        env:
+          PREP: ${{ steps.prep.outcome }}
+          VALIDATE: ${{ steps.validate.outcome }}
+          UNIT: ${{ steps.unit.outcome }}
+          DEBUG: ${{ steps.debug.outcome }}
+          RELEASE: ${{ steps.release.outcome }}
+        shell: bash
+        run: |
+          [[ "$PREP" == "success" && "$VALIDATE" == "success" && "$UNIT" == "success" && "$DEBUG" == "success" && "$RELEASE" == "success" ]]
