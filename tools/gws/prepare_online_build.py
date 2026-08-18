@@ -26,6 +26,14 @@ def replace_once(path: str, old: str, new: str) -> None:
 # Fire TV launcher support, Great White colors and the stable package-separation strategy.
 subprocess.run([sys.executable, str(ROOT / "tools/gws/prepare_build.py")], cwd=ROOT, check=True)
 
+# This Compose version exposes RowScope/ColumnScope.weight as a member extension. An explicit import
+# resolves to an internal layout symbol and fails Kotlin compilation, so Online deliberately omits it.
+replace_once(
+    "app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt",
+    "import androidx.compose.foundation.layout.weight\n",
+    "",
+)
+
 # --- Standalone app identity ---------------------------------------------------------------
 replace_once(
     "app/build.gradle.kts",
