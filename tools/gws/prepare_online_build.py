@@ -104,6 +104,11 @@ replace_once(
     '        MainSection.SERIES -> OwnTVIcon.SERIES\n        MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS',
     '        MainSection.SERIES -> OwnTVIcon.SERIES\n        MainSection.ONLINE -> OwnTVIcon.MOVIES\n        MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS',
 )
+replace_once(
+    "app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt",
+    '            MainSection.MOVIES -> {',
+    '            MainSection.MOVIES, MainSection.ONLINE -> {',
+)
 
 print("Great White Online build customizations applied:")
 print("  applicationId: com.greatwhitestreams.online")
