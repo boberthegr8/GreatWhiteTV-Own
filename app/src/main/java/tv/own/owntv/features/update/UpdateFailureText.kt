@@ -13,6 +13,7 @@ internal fun updateFailureText(failure: UpdateManager.Failure): String = when (f
     UpdateManager.Failure.CheckNetwork -> stringResource(R.string.update_failed_check)
     is UpdateManager.Failure.DownloadHttp -> stringResource(R.string.update_failed_download_http, failure.code.toString())
     UpdateManager.Failure.EmptyDownload -> stringResource(R.string.update_empty_download)
+    UpdateManager.Failure.DigestMismatch -> stringResource(R.string.online_update_digest_mismatch)
     UpdateManager.Failure.DownloadNetwork -> stringResource(R.string.update_failed_download)
     UpdateManager.Failure.Install -> stringResource(R.string.update_install_failed)
 }
