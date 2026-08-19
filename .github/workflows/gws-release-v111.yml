@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - '.github/GWS_V112_TRIGGER'
+      - '.github/GWS_V112_SECRET_TRIGGER'
 
 permissions:
   contents: write
@@ -64,71 +64,60 @@ jobs:
           grep -Fq 'org.stremio.watchhub' /tmp/watchhub.json
           echo 'Online catalog and WatchHub endpoints reachable.'
 
-      - name: Publish one-time signing handoff key
+      - name: Restore and verify permanent GWS signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}
+          GREATWHITE_TV_SIGNING_BUNDLE: ${{ secrets.GREATWHITE_TV_SIGNING_BUNDLE }}
         run: |
           set -euo pipefail
-          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /tmp/gws_private.pem 2>/dev/null
-          openssl pkey -in /tmp/gws_private.pem -pubout -out /tmp/gws_public.pem 2>/dev/null
-          git fetch origin main
-          git checkout -B main origin/main
-          mkdir -p .github/gws-handoff
-          cp /tmp/gws_public.pem ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem"
-          printf '%s\n' "$GITHUB_RUN_ID" > .github/GWS_V112_ACTIVE_RUN.txt
-          git config user.name 'GWS Release'
-          git config user.email 'actions@users.noreply.github.com'
-          git add .github/gws-handoff .github/GWS_V112_ACTIVE_RUN.txt
-          git commit -m "Publish GWS v1.0.12 one-time signing key for run ${GITHUB_RUN_ID} [skip ci]"
-          git push origin HEAD:main
+          KEYSTORE_FILE_LOCAL=''
+          STORE_PASS=''
+          ALIAS=''
+          KEY_PASS=''
 
-      - name: Wait for encrypted signing bundle
-        run: |
-          set -euo pipefail
-          found=0
-          for i in $(seq 1 240); do
-            git fetch -q origin main
-            P=".github/gws-handoff/payload-${GITHUB_RUN_ID}.b64"
-            K=".github/gws-handoff/key-${GITHUB_RUN_ID}.b64"
-            I=".github/gws-handoff/iv-${GITHUB_RUN_ID}.hex"
-            if git show "origin/main:$P" > /tmp/payload.b64 2>/dev/null \
-              && git show "origin/main:$K" > /tmp/aeskey.b64 2>/dev/null \
-              && git show "origin/main:$I" > /tmp/iv.hex 2>/dev/null; then
-              found=1
-              break
-            fi
-            sleep 5
-          done
-          test "$found" = '1'
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            test -n "$KEYSTORE_PASSWORD_SECRET"
+            test -n "$KEY_ALIAS_SECRET"
+            test -n "$KEY_PASSWORD_SECRET"
+            KEYSTORE_FILE_LOCAL="$RUNNER_TEMP/release.keystore"
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE_LOCAL"
+            STORE_PASS="$KEYSTORE_PASSWORD_SECRET"
+            ALIAS="$KEY_ALIAS_SECRET"
+            KEY_PASS="$KEY_PASSWORD_SECRET"
+            echo 'Permanent signing restored from repository keystore secrets.'
+          elif [ -n "$GREATWHITE_TV_SIGNING_BUNDLE" ]; then
+            mkdir -p "$RUNNER_TEMP/gws-signing"
+            printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/gws-signing.zip"
+            unzip -q "$RUNNER_TEMP/gws-signing.zip" -d "$RUNNER_TEMP/gws-signing"
+            test -s "$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks"
+            test -s "$RUNNER_TEMP/gws-signing/signing.env"
+            set -a
+            . "$RUNNER_TEMP/gws-signing/signing.env"
+            set +a
+            KEYSTORE_FILE_LOCAL="$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks"
+            STORE_PASS="$KEYSTORE_PASSWORD"
+            ALIAS="$KEY_ALIAS"
+            KEY_PASS="$KEY_PASSWORD"
+            echo 'Permanent signing restored from repository compatibility bundle.'
+          else
+            echo '::error::Permanent GWS signing secret is not configured.'
+            exit 1
+          fi
 
-      - name: Recover and verify original GWS signing key
-        run: |
-          set -euo pipefail
-          base64 -d /tmp/aeskey.b64 > /tmp/aeskey.enc
-          base64 -d /tmp/payload.b64 > /tmp/payload.enc
-          openssl pkeyutl -decrypt \
-            -inkey /tmp/gws_private.pem \
-            -in /tmp/aeskey.enc \
-            -out /tmp/aeskey.bin \
-            -pkeyopt rsa_padding_mode:oaep \
-            -pkeyopt rsa_oaep_md:sha256
-          AES_HEX=$(od -An -tx1 -v /tmp/aeskey.bin | tr -d ' \n')
-          IV_HEX=$(tr -d '[:space:]' < /tmp/iv.hex)
-          openssl enc -d -aes-256-cbc -K "$AES_HEX" -iv "$IV_HEX" -in /tmp/payload.enc -out /tmp/signing-bundle.zip
-          mkdir -p /tmp/gws-signing
-          unzip -q /tmp/signing-bundle.zip -d /tmp/gws-signing
-          test -s /tmp/gws-signing/signing/GreatWhiteTV-release.jks
-          test -s /tmp/gws-signing/signing.env
-          set -a
-          . /tmp/gws-signing/signing.env
-          set +a
-          echo "::add-mask::$KEYSTORE_PASSWORD"
-          echo "::add-mask::$KEY_PASSWORD"
-          CERT=$(keytool -list -v -keystore /tmp/gws-signing/signing/GreatWhiteTV-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>/dev/null | awk -F': ' '/SHA256:/{gsub(":","",$2); print toupper($2); exit}')
+          echo "::add-mask::$STORE_PASS"
+          echo "::add-mask::$KEY_PASS"
+          CERT=$(keytool -list -v -keystore "$KEYSTORE_FILE_LOCAL" -storepass "$STORE_PASS" -alias "$ALIAS" 2>/dev/null | sed -n 's/.*SHA256: //p' | head -n1 | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          echo "Recovered certificate: $CERT"
           test "$CERT" = "$EXPECTED_CERT_SHA256"
-          echo "Original GWS certificate verified: $CERT"
-          echo 'KEYSTORE_FILE=/tmp/gws-signing/signing/GreatWhiteTV-release.jks' >> "$GITHUB_ENV"
-          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+
+          echo "KEYSTORE_FILE=$KEYSTORE_FILE_LOCAL" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
+          echo 'Correct original GWS signing identity verified.'
 
       - name: Build GWS Online ARM release APK
         run: |
@@ -203,7 +192,7 @@ jobs:
       - name: Publish GWS Online v1.0.12
         run: |
           set -euo pipefail
-          NOTES=$'GWS Online v1.0.12\n\n- Restores the approved compact browse layout: 180dp category column and 450dp channel column.\n- Restores the original Android TV launcher behavior so the old OwnTV banner is no longer forced.\n- App label remains GWS Online.\n- Keeps Online and enables WatchHub as a built-in resolver alongside the existing Online catalog and public-domain source.\n- Preserves the existing package ID and original GWS signing certificate for in-place updates.'
+          NOTES=$'GWS Online v1.0.12\n\n- Restores the approved compact browse layout: 180dp category column and 450dp channel column.\n- Restores the original Android TV launcher behavior so the old OwnTV banner is no longer forced.\n- App label is GWS Online.\n- Keeps Online and enables WatchHub as a built-in resolver alongside the existing Online catalog and public-domain source.\n- Preserves the existing package ID and original GWS signing certificate for in-place updates.'
           if gh release view v1.0.12 >/dev/null 2>&1; then
             gh release upload v1.0.12 dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk dist/GreatWhiteTV.apk dist/OwnTV.apk dist/GWSOnline.sha256 --clobber
             gh release edit v1.0.12 --title 'GWS Online v1.0.12' --notes "$NOTES" --latest
@@ -232,15 +221,13 @@ jobs:
           done
           echo 'PUBLIC_URLS_OK=true' >> "$GITHUB_ENV"
 
-      - name: Record verified release status and clean handoff
+      - name: Record verified release status
         if: always()
         run: |
           set -euo pipefail
           git fetch origin main
           git checkout -B main origin/main
-          rm -f .github/GWS_V112_TRIGGER .github/GWS_V112_ACTIVE_RUN.txt
-          rm -f ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem" ".github/gws-handoff/payload-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/key-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/iv-${GITHUB_RUN_ID}.hex"
-          rmdir .github/gws-handoff 2>/dev/null || true
+          rm -f .github/GWS_V112_SECRET_TRIGGER
           {
             echo 'version=1.0.12'
             echo "run_id=$GITHUB_RUN_ID"
