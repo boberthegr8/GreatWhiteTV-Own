@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: "Release version to publish (example: 1.0.2). Leave blank for a dev build."
+        description: "Release version to publish (example: 1.0.8). Leave blank for a dev build."
         required: false
         type: string
 
@@ -67,7 +67,7 @@ jobs:
     env:
       IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
       MANUAL_VERSION: ${{ github.event.inputs.release_version || '' }}
-      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Great White TV v')) }}
+      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release GWS Online v')) }}
       APK_OUT: ""
       EXPECTED_CERT_SHA256: "EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C"
     steps:
@@ -103,7 +103,7 @@ jobs:
 
           if [ "$IS_RELEASE" = "true" ]; then
             if ! printf '%s' "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-              echo "::error::Release version must be X.Y.Z, for example 1.0.2"
+              echo "::error::Release version must be X.Y.Z, for example 1.0.8"
               exit 1
             fi
             IFS='.' read -r MA MI PA <<< "$NAME"
@@ -117,7 +117,7 @@ jobs:
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
           echo "Version: $NAME (code $CODE); release=$IS_RELEASE"
 
-      - name: Restore permanent Great White signing key
+      - name: Restore permanent GWS Online signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -140,24 +140,24 @@ jobs:
             echo "KEY_PASSWORD=$KEY_PASSWORD_SECRET" >> "$GITHUB_ENV"
             echo "Permanent signing restored from existing repository secrets."
           elif [ -n "$GREATWHITE_TV_SIGNING_BUNDLE" ]; then
-            mkdir -p "$RUNNER_TEMP/greatwhite-signing"
-            printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/greatwhite-signing.zip"
-            unzip -q "$RUNNER_TEMP/greatwhite-signing.zip" -d "$RUNNER_TEMP/greatwhite-signing"
-            test -s "$RUNNER_TEMP/greatwhite-signing/signing/GreatWhiteTV-release.jks"
-            test -s "$RUNNER_TEMP/greatwhite-signing/signing.env"
+            mkdir -p "$RUNNER_TEMP/gws-signing"
+            printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/gws-signing.zip"
+            unzip -q "$RUNNER_TEMP/gws-signing.zip" -d "$RUNNER_TEMP/gws-signing"
+            test -s "$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks"
+            test -s "$RUNNER_TEMP/gws-signing/signing.env"
             set -a
-            . "$RUNNER_TEMP/greatwhite-signing/signing.env"
+            . "$RUNNER_TEMP/gws-signing/signing.env"
             set +a
             echo "::add-mask::$KEYSTORE_PASSWORD"
             echo "::add-mask::$KEY_PASSWORD"
-            echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-signing/signing/GreatWhiteTV-release.jks" >> "$GITHUB_ENV"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks" >> "$GITHUB_ENV"
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
             echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-            echo "Permanent signing restored from GREATWHITE_TV_SIGNING_BUNDLE."
+            echo "Permanent signing restored from compatibility signing bundle."
           else
             if [ "$IS_RELEASE" = "true" ]; then
-              echo "::error::Refusing to publish a Great White release without the permanent signing key."
+              echo "::error::Refusing to publish a GWS Online release without the permanent signing key."
               exit 1
             fi
             echo "No signing secret configured — non-release build will use debug signing."
@@ -214,31 +214,32 @@ jobs:
               | tr '[:lower:]' '[:upper:]'
           )
           if [ "$ACTUAL" != "$EXPECTED_CERT_SHA256" ]; then
-            echo "::error::APK signer mismatch. Refusing to publish an APK that cannot update existing Great White TV installs."
+            echo "::error::APK signer mismatch. Refusing to publish an APK that cannot update existing GWS Online installs."
             echo "Expected: $EXPECTED_CERT_SHA256"
             echo "Actual:   $ACTUAL"
             exit 1
           fi
-          echo "Verified permanent Great White signing certificate: $ACTUAL"
+          echo "Verified permanent GWS Online signing certificate: $ACTUAL"
 
       - name: Name the APK
         run: |
           mkdir -p dist
           if [ "$IS_RELEASE" = "true" ]; then
-            OUT="GreatWhiteTV-v${{ steps.ver.outputs.name }}.apk"
+            OUT="GWSOnline-v${{ steps.ver.outputs.name }}.apk"
           else
-            OUT="GreatWhiteTV-dev-${GITHUB_SHA::7}.apk"
+            OUT="GWSOnline-dev-${GITHUB_SHA::7}.apk"
           fi
           cp "$ARM_SRC" "dist/$OUT"
           echo "APK_OUT=$OUT" >> "$GITHUB_ENV"
           if [ "$IS_RELEASE" = "true" ]; then
-            # Permanent public/download/updater filename from this point forward.
+            # Primary public/download/updater filename.
+            cp "$ARM_SRC" "dist/GWSOnline.apk"
+            # Compatibility aliases only. Older installed builds may still request these names;
+            # they are byte-for-byte the same signed GWS Online APK.
             cp "$ARM_SRC" "dist/GreatWhiteTV.apk"
-            # Legacy bridge: v1.0.1's updater prefers OwnTV.apk. Keep this alias so installed
-            # v1.0.1 boxes can update in place to the first GreatWhiteTV.apk-based release.
             cp "$ARM_SRC" "dist/OwnTV.apk"
             if [ -n "${X86_SRC:-}" ]; then
-              cp "$X86_SRC" "dist/GreatWhiteTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
+              cp "$X86_SRC" "dist/GWSOnline-x86_64-v${{ steps.ver.outputs.name }}.apk"
             fi
           fi
 
@@ -266,7 +267,7 @@ jobs:
             mv dist/RELEASE_NOTES.trimmed.md dist/RELEASE_NOTES.md
           fi
           if [ ! -s dist/RELEASE_NOTES.md ]; then
-            echo "Great White TV $TAG update." > dist/RELEASE_NOTES.md
+            echo "GWS Online $TAG update." > dist/RELEASE_NOTES.md
           fi
           cat dist/RELEASE_NOTES.md
 
@@ -276,11 +277,12 @@ jobs:
         with:
           tag_name: v${{ steps.ver.outputs.name }}
           target_commitish: ${{ github.sha }}
-          name: Great White TV v${{ steps.ver.outputs.name }}
+          name: GWS Online v${{ steps.ver.outputs.name }}
           files: |
             dist/${{ env.APK_OUT }}
+            dist/GWSOnline.apk
             dist/GreatWhiteTV.apk
             dist/OwnTV.apk
-            dist/GreatWhiteTV-x86_64-v${{ steps.ver.outputs.name }}.apk
+            dist/GWSOnline-x86_64-v${{ steps.ver.outputs.name }}.apk
           body_path: dist/RELEASE_NOTES.md
           generate_release_notes: false
