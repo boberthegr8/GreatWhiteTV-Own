@@ -1,0 +1,51 @@
+name: Apply Great White Signing Repair
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'SIGNING_FIX_TRIGGER.md'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Patch release workflows to original Great White signing lineage
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              n = text.count(old)
+              if n != 1:
+                  raise SystemExit(f'{path}: expected one match, found {n}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          def patch(path):
+              once(path,
+              '''        env:\n          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}\n          KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}\n          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}\n          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}\n          GREATWHITE_TV_SIGNING_BUNDLE: ${{ secrets.GREATWHITE_TV_SIGNING_BUNDLE }}\n        run: |\n          set -euo pipefail\n          if [ -n "$KEYSTORE_BASE64" ]; then''',
+              '''        env:\n          GWS_KEYSTORE_BASE64_SECRET: ${{ secrets.GWS_KEYSTORE_BASE64 }}\n          GWS_KEYSTORE_PASSWORD_SECRET: ${{ secrets.GWS_KEYSTORE_PASSWORD }}\n          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}\n          KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}\n          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}\n          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}\n          GREATWHITE_TV_SIGNING_BUNDLE: ${{ secrets.GREATWHITE_TV_SIGNING_BUNDLE }}\n        run: |\n          set -euo pipefail\n          if [ -n "$GWS_KEYSTORE_BASE64_SECRET" ]; then\n            test -n "$GWS_KEYSTORE_PASSWORD_SECRET"\n            printf '%s' "$GWS_KEYSTORE_BASE64_SECRET" | base64 --decode > "$RUNNER_TEMP/greatwhite-release.jks"\n            echo "::add-mask::$GWS_KEYSTORE_PASSWORD_SECRET"\n            echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-release.jks" >> "$GITHUB_ENV"\n            echo "KEYSTORE_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"\n            echo "KEY_ALIAS=greatwhite" >> "$GITHUB_ENV"\n            echo "KEY_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"\n            echo "Permanent signing restored from original GWS release secrets."\n          elif [ -n "$KEYSTORE_BASE64" ]; then''')
+
+          patch('.github/workflows/android.yml')
+          patch('.github/workflows/online-bootstrap.yml')
+          PY
+
+      - name: Commit signing repair and remove one-shot workflows
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/fix-gws-signing.yml .github/workflows/fix-gws-signing-pr.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/android.yml .github/workflows/online-bootstrap.yml .github/workflows/fix-gws-signing.yml .github/workflows/fix-gws-signing-pr.yml
+          git commit -m 'Use original Great White signing credentials for releases'
+          git push origin HEAD:main
