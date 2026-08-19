@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_update_startup">Manual updates only</string>
+    <string name="settings_update_startup_description">Automatic update checks are disabled. Use Check for updates above when you want to look for a new version. This legacy switch is ignored.</string>
+</resources>
