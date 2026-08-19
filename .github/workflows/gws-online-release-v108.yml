@@ -33,6 +33,24 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Refresh GWS Online technical literal inventory
+        run: |
+          set -euo pipefail
+          python3 tools/i18n/check_hardcoded_strings.py prune-safe
+          python3 tools/i18n/check_hardcoded_strings.py classify-safe \
+            --path app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt \
+            --text 'GWSOnline' \
+            --category technical
+          python3 tools/i18n/check_hardcoded_strings.py classify-safe \
+            --path app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt \
+            --text 'GWSOnline.apk' \
+            --category file-path
+          python3 tools/i18n/check_hardcoded_strings.py classify-safe \
+            --path app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt \
+            --text 'gws-online-update.apk' \
+            --category file-path
+          python3 tools/i18n/check_hardcoded_strings.py verify --bootstrap
+
       - name: Unit tests
         run: |
           chmod +x ./gradlew
