@@ -3,16 +3,13 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- GWS launcher mark. Kept entirely inside the adaptive icon safe zone. -->
+    <!-- OwnTV mark: cyan play triangle inside a rounded square, kept within the adaptive safe zone. -->
     <path
         android:fillColor="#00000000"
         android:strokeColor="#22D3EE"
-        android:strokeWidth="3.5"
-        android:pathData="M27,31 L81,31 A12,12 0 0 1 93,43 L93,65 A12,12 0 0 1 81,77 L27,77 A12,12 0 0 1 15,65 L15,43 A12,12 0 0 1 27,31 Z" />
-    <!-- G -->
-    <path android:fillColor="#22D3EE" android:pathData="M25,42 H42 V47 H31 V61 H39 V56 H35 V52 H44 V66 H25 Z" />
-    <!-- W -->
-    <path android:fillColor="#FFFFFF" android:pathData="M47,42 H52 L55,59 L59,48 L63,59 L66,42 H71 L66,66 H61 L59,58 L56,66 H51 Z" />
-    <!-- S -->
-    <path android:fillColor="#22D3EE" android:pathData="M74,42 H88 V47 H79 V51 H86 V56 H79 V61 H88 V66 H74 Z" />
+        android:strokeWidth="4"
+        android:pathData="M42,30 L66,30 A12,12 0 0 1 78,42 L78,66 A12,12 0 0 1 66,78 L42,78 A12,12 0 0 1 30,66 L30,42 A12,12 0 0 1 42,30 Z" />
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M47,44 L68,54 L47,64 Z" />
 </vector>
