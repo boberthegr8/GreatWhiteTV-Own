@@ -1,0 +1,145 @@
+name: Great White Signed Release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'GWS_VERSION'
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Release version (X.Y.Z). Leave blank to use GWS_VERSION.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_CERT_SHA256: 'EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Resolve release version
+        id: version
+        env:
+          MANUAL_VERSION: ${{ github.event.inputs.release_version || '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$MANUAL_VERSION" ]; then
+            VERSION="${MANUAL_VERSION#v}"
+          else
+            test -s GWS_VERSION
+            VERSION="$(tr -d '[:space:]' < GWS_VERSION)"
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Release version must be X.Y.Z"
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          CODE=$(( MAJOR * 10000 + MINOR * 100 + PATCH ))
+          [ "$CODE" -gt 0 ]
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Unit tests and lint
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew testStandardDebugUnitTest lintStandardDebug --stacktrace
+
+      - name: Restore original Great White signing key
+        env:
+          GWS_KEYSTORE_BASE64_SECRET: ${{ secrets.GWS_KEYSTORE_BASE64 }}
+          GWS_KEYSTORE_PASSWORD_SECRET: ${{ secrets.GWS_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GWS_KEYSTORE_BASE64_SECRET" ] || [ -z "$GWS_KEYSTORE_PASSWORD_SECRET" ]; then
+            echo "::error::Original Great White signing secrets are missing. Refusing to publish an incompatible APK."
+            exit 1
+          fi
+          printf '%s' "$GWS_KEYSTORE_BASE64_SECRET" | base64 --decode > "$RUNNER_TEMP/greatwhite-release.jks"
+          echo "::add-mask::$GWS_KEYSTORE_PASSWORD_SECRET"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-release.jks" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=greatwhite" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
+
+      - name: Derive release edge key
+        env:
+          OWNTV_EDGE_MASTER: ${{ secrets.OWNTV_EDGE_MASTER }}
+          OWNTV_EDGE_KEY_SECRET: ${{ secrets.OWNTV_EDGE_KEY }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          if [ -n "$OWNTV_EDGE_MASTER" ]; then
+            KEY=$(printf '%s' "$VERSION_NAME" | openssl dgst -sha256 -hmac "$OWNTV_EDGE_MASTER" -hex | awk '{print $NF}')
+            echo "::add-mask::$KEY"
+            echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
+          elif [ -n "$OWNTV_EDGE_KEY_SECRET" ]; then
+            echo "::add-mask::$OWNTV_EDGE_KEY_SECRET"
+            echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build permanently signed APKs
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease --stacktrace
+          ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
+          X86_SRC=$(ls app/build/outputs/apk/x86_64/release/*.apk | head -n1)
+          test -f "$ARM_SRC"
+          test -f "$X86_SRC"
+
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          ACTUAL=$("$APKSIGNER" verify --print-certs "$ARM_SRC" \
+            | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}' \
+            | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          if [ "$ACTUAL" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::Signer mismatch; refusing to publish an APK that cannot update installed Great White TV."
+            echo "Expected: $EXPECTED_CERT_SHA256"
+            echo "Actual:   $ACTUAL"
+            exit 1
+          fi
+
+          VERSION='${{ steps.version.outputs.name }}'
+          mkdir -p dist
+          cp "$ARM_SRC" "dist/GreatWhiteTV-v${VERSION}.apk"
+          cp "$ARM_SRC" dist/GreatWhiteTV.apk
+          # Compatibility bridge for v1.0.1, whose updater still prefers this legacy asset name.
+          cp "$ARM_SRC" dist/OwnTV.apk
+          cp "$X86_SRC" "dist/GreatWhiteTV-x86_64-v${VERSION}.apk"
+          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: Great White TV v${{ steps.version.outputs.name }}
+          body: |
+            Great White TV v${{ steps.version.outputs.name }}.
+            Permanently signed for in-place updates of the existing Great White installation.
+          files: |
+            dist/GreatWhiteTV-v${{ steps.version.outputs.name }}.apk
+            dist/GreatWhiteTV.apk
+            dist/OwnTV.apk
+            dist/GreatWhiteTV-x86_64-v${{ steps.version.outputs.name }}.apk
+            dist/SHA256SUMS.txt
