@@ -1,0 +1,5 @@
+version=1.0.7
+signing_outcome=failure
+signing_source=none
+build_outcome=skipped
+publish_outcome=skipped
