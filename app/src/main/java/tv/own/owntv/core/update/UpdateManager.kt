@@ -19,10 +19,10 @@ import java.io.File
 import java.io.IOException
 
 /**
- * Manual in-app updates straight from Great White TV's GitHub Releases: checks this repo's latest
+ * Manual in-app updates straight from GWS Online's GitHub Releases: checks this repo's latest
  * release only when the user explicitly asks, compares its tag with the installed version, downloads
  * the release APK, and hands it to the system installer. The release workflow publishes a stable
- * `GreatWhiteTV.apk` for real Android TV / Fire TV devices plus a separate x86_64 APK for emulators.
+ * `GWSOnline.apk` for real Android TV / Fire TV devices plus a separate x86_64 APK for emulators.
  */
 class UpdateManager(
     private val context: Context,
@@ -74,13 +74,13 @@ class UpdateManager(
 
     /**
      * Legacy startup hook retained so an older shell/settings preference cannot trigger an update check.
-     * Great White updates are manual-only: callers that represent an explicit user action must use
+     * GWS Online updates are manual-only: callers that represent an explicit user action must use
      * [checkManual]. This is intentionally a true no-op so it cannot interrupt a manual check already
      * in progress during the first few seconds after app launch.
      */
     fun check() = Unit
 
-    /** Queries Great White TV's latest release after an explicit user action. */
+    /** Queries GWS Online's latest release after an explicit user action. */
     fun checkManual() {
         if (_state.value is State.Checking || _state.value is State.Downloading) return
         _state.value = State.Checking
@@ -89,7 +89,7 @@ class UpdateManager(
                 val request = Request.Builder()
                     .url("https://api.github.com/repos/$REPO/releases/latest")
                     .header("Accept", "application/vnd.github+json")
-                    .header("User-Agent", "GreatWhiteTV")
+                    .header("User-Agent", "GWSOnline")
                     .build()
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) throw CheckHttpException(resp.code)
@@ -100,9 +100,9 @@ class UpdateManager(
                         ?: throw InvalidReleaseResponseException()
                     val notes = o.optString("body").take(16_000)
                     val assets = o.optJSONArray("assets") ?: throw InvalidReleaseResponseException()
-                    // Great White releases carry a stable ARM APK named GreatWhiteTV.apk plus a versioned
-                    // x86_64 APK. OwnTV.apk remains accepted only as a compatibility bridge for installs
-                    // created before the release asset was renamed.
+                    // GWS Online releases carry a stable ARM APK named GWSOnline.apk plus a versioned
+                    // x86_64 APK. Older filenames remain accepted only as compatibility bridges so
+                    // already-installed Great White / OwnTV-branded builds can update in place.
                     val wantX86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
                     val candidates = (0 until assets.length())
                         .asSequence()
@@ -116,7 +116,8 @@ class UpdateManager(
                     val apkUrl = if (wantX86) {
                         candidates.firstOrNull { (name, _) -> name.contains("x86_64", ignoreCase = true) }?.second
                     } else {
-                        candidates.firstOrNull { (name, _) -> name.equals("GreatWhiteTV.apk", ignoreCase = true) }?.second
+                        candidates.firstOrNull { (name, _) -> name.equals("GWSOnline.apk", ignoreCase = true) }?.second
+                            ?: candidates.firstOrNull { (name, _) -> name.equals("GreatWhiteTV.apk", ignoreCase = true) }?.second
                             ?: candidates.firstOrNull { (name, _) -> name.equals("OwnTV.apk", ignoreCase = true) }?.second
                             ?: candidates.firstOrNull { (name, _) -> !name.contains("x86_64", ignoreCase = true) }?.second
                     } ?: throw NoCompatibleApkException()
@@ -138,8 +139,8 @@ class UpdateManager(
         scope.launch {
             runCatching {
                 val dir = File(context.filesDir, "updates").apply { mkdirs() }
-                val out = File(dir, "greatwhite-tv-update.apk")
-                val request = Request.Builder().url(info.apkUrl).header("User-Agent", "GreatWhiteTV").build()
+                val out = File(dir, "gws-online-update.apk")
+                val request = Request.Builder().url(info.apkUrl).header("User-Agent", "GWSOnline").build()
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) throw DownloadHttpException(resp.code)
                     val body = resp.body
@@ -160,7 +161,7 @@ class UpdateManager(
                     if (copied == 0L) throw EmptyDownloadException()
                 }
                 runCatching { install(out) }.getOrElse { throw InstallException(it) }
-                _state.value = State.Available(info) // dialog stays sane if the user cancels install
+                _state.value = State.Available(info)
             }.onFailure { error ->
                 Log.w(TAG, "update download failed: ${error.message}", error)
                 val failure = if (error is InstallException) Failure.Install else failureFor(error, checking = false)
