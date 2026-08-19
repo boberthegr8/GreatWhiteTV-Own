@@ -67,7 +67,7 @@ jobs:
     env:
       IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
       MANUAL_VERSION: ${{ github.event.inputs.release_version || '' }}
-      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '') }}
+      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Release Great White TV v')) }}
       APK_OUT: ""
       EXPECTED_CERT_SHA256: "EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C"
     steps:
@@ -94,6 +94,9 @@ jobs:
             NAME="${GITHUB_REF_NAME#v}"
           elif [ -n "$MANUAL_VERSION" ]; then
             NAME="${MANUAL_VERSION#v}"
+          elif [ "$IS_RELEASE" = "true" ] && [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            test -s GWS_VERSION
+            NAME="$(tr -d '[:space:]' < GWS_VERSION)"
           else
             NAME="99.99.99"
           fi
