@@ -64,22 +64,48 @@ jobs:
           chmod +x ./gradlew
           ./gradlew testStandardDebugUnitTest lintStandardDebug --stacktrace
 
-      - name: Restore original Great White signing key
+      - name: Restore permanent Great White signing key
         env:
-          GWS_KEYSTORE_BASE64_SECRET: ${{ secrets.GWS_KEYSTORE_BASE64 }}
-          GWS_KEYSTORE_PASSWORD_SECRET: ${{ secrets.GWS_KEYSTORE_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}
+          GREATWHITE_TV_SIGNING_BUNDLE: ${{ secrets.GREATWHITE_TV_SIGNING_BUNDLE }}
         run: |
           set -euo pipefail
-          if [ -z "$GWS_KEYSTORE_BASE64_SECRET" ] || [ -z "$GWS_KEYSTORE_PASSWORD_SECRET" ]; then
-            echo "::error::Original Great White signing secrets are missing. Refusing to publish an incompatible APK."
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            if [ -z "$KEYSTORE_PASSWORD_SECRET" ] || [ -z "$KEY_ALIAS_SECRET" ] || [ -z "$KEY_PASSWORD_SECRET" ]; then
+              echo "::error::KEYSTORE_BASE64 is configured but one or more signing credential secrets are missing."
+              exit 1
+            fi
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "::add-mask::$KEYSTORE_PASSWORD_SECRET"
+            echo "::add-mask::$KEY_PASSWORD_SECRET"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS_SECRET" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD_SECRET" >> "$GITHUB_ENV"
+            echo "Permanent signing restored from existing repository secrets."
+          elif [ -n "$GREATWHITE_TV_SIGNING_BUNDLE" ]; then
+            mkdir -p "$RUNNER_TEMP/greatwhite-signing"
+            printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/greatwhite-signing.zip"
+            unzip -q "$RUNNER_TEMP/greatwhite-signing.zip" -d "$RUNNER_TEMP/greatwhite-signing"
+            test -s "$RUNNER_TEMP/greatwhite-signing/signing/GreatWhiteTV-release.jks"
+            test -s "$RUNNER_TEMP/greatwhite-signing/signing.env"
+            set -a
+            . "$RUNNER_TEMP/greatwhite-signing/signing.env"
+            set +a
+            echo "::add-mask::$KEYSTORE_PASSWORD"
+            echo "::add-mask::$KEY_PASSWORD"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-signing/signing/GreatWhiteTV-release.jks" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "Permanent signing restored from GREATWHITE_TV_SIGNING_BUNDLE."
+          else
+            echo "::error::Refusing to publish a Great White release without the permanent signing key."
             exit 1
           fi
-          printf '%s' "$GWS_KEYSTORE_BASE64_SECRET" | base64 --decode > "$RUNNER_TEMP/greatwhite-release.jks"
-          echo "::add-mask::$GWS_KEYSTORE_PASSWORD_SECRET"
-          echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-release.jks" >> "$GITHUB_ENV"
-          echo "KEYSTORE_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=greatwhite" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
 
       - name: Derive release edge key
         env:
@@ -123,7 +149,6 @@ jobs:
           mkdir -p dist
           cp "$ARM_SRC" "dist/GreatWhiteTV-v${VERSION}.apk"
           cp "$ARM_SRC" dist/GreatWhiteTV.apk
-          # Compatibility bridge for v1.0.1, whose updater still prefers this legacy asset name.
           cp "$ARM_SRC" dist/OwnTV.apk
           cp "$X86_SRC" "dist/GreatWhiteTV-x86_64-v${VERSION}.apk"
           sha256sum dist/*.apk > dist/SHA256SUMS.txt
