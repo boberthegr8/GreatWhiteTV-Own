@@ -1,6 +1,0 @@
-version=1.0.6
-signing_ok=false
-build_outcome=skipped
-build_ok=false
-publish_outcome=skipped
-reason=Permanent signing secret missing on main workflow
