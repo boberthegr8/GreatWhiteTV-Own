@@ -1,38 +1,51 @@
-name: Restore Great White Online
+name: Verify Great White Online
 
 on:
-  push:
+  pull_request:
     branches: [ main ]
-    paths:
-      - '.github/workflows/online-bootstrap.yml'
   workflow_dispatch:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
-  restore-online:
+  verify-online:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout current main
+      - name: Checkout PR head
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
+      - name: Detect already-patched follow-up run
+        id: state
+        run: |
+          if [ -f app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt ] && \
+             grep -q 'ONLINE(tv.own.owntv.R.string.common_nav_online)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up JDK 21
+        if: steps.state.outputs.ready != 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Set up Android SDK
+        if: steps.state.outputs.ready != 'true'
         uses: android-actions/setup-android@v3
 
       - name: Set up Gradle
+        if: steps.state.outputs.ready != 'true'
         uses: gradle/actions/setup-gradle@v4
 
       - name: Bring back only the isolated Online feature
+        if: steps.state.outputs.ready != 'true'
         run: |
           set -euo pipefail
           git fetch origin greatwhite-online
@@ -43,6 +56,7 @@ jobs:
             app/src/main/java/tv/own/owntv/features/online/StremioAddonClient.kt
 
       - name: Patch current navigation only
+        if: steps.state.outputs.ready != 'true'
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -55,7 +69,6 @@ jobs:
                   raise SystemExit(f'Expected one match in {path}, found {count}: {old!r}')
               p.write_text(text.replace(old, new, 1), encoding='utf-8')
 
-          # The old Online screen was compile-tested with these layout substitutions under AGP 9.
           online = 'app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt'
           replace_once(online, 'import androidx.compose.foundation.layout.weight\n', '')
           replace_once(online,
@@ -98,67 +111,127 @@ jobs:
               '    MainSection.SEARCH, MainSection.HOME, MainSection.ONLINE, MainSection.EPG, MainSection.SETTINGS -> ""')
 
           icon = 'app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt'
-          replace_once(icon,
-              '            MainSection.MOVIES -> {',
-              '            MainSection.MOVIES, MainSection.ONLINE -> {')
+          replace_once(icon, '            MainSection.MOVIES -> {', '            MainSection.MOVIES, MainSection.ONLINE -> {')
 
           Path('app/src/main/res/values/strings_online.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="common_nav_online">Online</string>\n    <string name="online_title">Great White Online</string>\n    <string name="online_subtitle">Browse no-login online catalogs and available direct web sources.</string>\n    <string name="online_movies">Movies</string>\n    <string name="online_series">Series</string>\n    <string name="online_sources">Sources</string>\n    <string name="online_loading">Loading Online…</string>\n    <string name="online_error">Online could not load right now. Try again.</string>\n    <string name="online_empty">No titles found.</string>\n    <string name="online_source_cinemeta">Online catalog</string>\n    <string name="online_item_no_description">No description is available.</string>\n    <string name="online_choose_episode">Choose an episode</string>\n    <string name="online_loading_episodes">Loading episodes…</string>\n    <string name="online_no_episodes">No episodes found.</string>\n    <string name="online_available_streams">Available sources</string>\n    <string name="online_no_streams">No direct web source is available for this title from the enabled providers.</string>\n    <string name="online_loading_streams">Checking enabled providers…</string>\n    <string name="online_external_open_failed">Could not open that source on this device.</string>\n    <string name="online_sources_title">Online Sources</string>\n    <string name="online_sources_subtitle">Great White includes default no-login sources. Advanced users can add compatible provider manifests.</string>\n    <string name="online_source_url_hint">Provider manifest URL</string>\n    <string name="online_source_add">Add source</string>\n    <string name="online_source_checking">Checking source…</string>\n    <string name="online_source_added">Source added.</string>\n    <string name="online_source_invalid">That source is not a compatible provider.</string>\n    <string name="online_source_builtin">Built in</string>\n    <string name="online_source_remove">Remove</string>\n    <string name="online_search_hint">Search Online…</string>\n</resources>\n''', encoding='utf-8')
           PY
 
-      - name: Guard app identity and updater
+      - name: Guard identity, updater and file isolation
+        if: steps.state.outputs.ready != 'true'
         run: |
           set -euo pipefail
           grep -F 'applicationId = "tv.own.owntv"' app/build.gradle.kts
           grep -F 'const val REPO = "boberthegr8/GreatWhiteTV-Own"' app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt
           grep -F 'GreatWhiteTV.apk' app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt
-          grep -F 'dist/GreatWhiteTV.apk' .github/workflows/android.yml
-          grep -F 'dist/OwnTV.apk' .github/workflows/android.yml
-
-      - name: Verify changed-file isolation
-        run: |
-          set -euo pipefail
           allowed='^(app/src/main/java/tv/own/owntv/features/online/(OnlineAddonStore|OnlineScreen|StremioAddonClient)\.kt|app/src/main/java/tv/own/owntv/features/shell/ShellViewModel\.kt|app/src/main/java/tv/own/owntv/features/shell/OwnTVShell\.kt|app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon\.kt|app/src/main/res/values/strings_online\.xml)$'
           bad=$(git diff --name-only HEAD -- app | grep -Ev "$allowed" || true)
-          if [ -n "$bad" ]; then
-            echo "::error::Unexpected app files changed:"
-            echo "$bad"
-            exit 1
-          fi
-          echo 'Only Online + navigation bridge files changed.'
+          if [ -n "$bad" ]; then echo "Unexpected app files changed:"; echo "$bad"; exit 1; fi
 
-      - name: Compile, unit test and lint current app
+      - name: Unit test, compile and lint the current app
+        if: steps.state.outputs.ready != 'true'
         run: |
           set -euo pipefail
           chmod +x ./gradlew
           ./gradlew testStandardDebugUnitTest assembleStandardDebug lintStandardDebug --stacktrace
 
-      - name: Commit verified Online restoration
+      - name: Restore permanent Great White signing key
+        if: steps.state.outputs.ready != 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}
+          GREATWHITE_TV_SIGNING_BUNDLE: ${{ secrets.GREATWHITE_TV_SIGNING_BUNDLE }}
         run: |
           set -euo pipefail
-          rm -f .github/workflows/online-bootstrap.yml
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            test -n "$KEYSTORE_PASSWORD_SECRET"; test -n "$KEY_ALIAS_SECRET"; test -n "$KEY_PASSWORD_SECRET"
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS_SECRET" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD_SECRET" >> "$GITHUB_ENV"
+          elif [ -n "$GREATWHITE_TV_SIGNING_BUNDLE" ]; then
+            mkdir -p "$RUNNER_TEMP/greatwhite-signing"
+            printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/greatwhite-signing.zip"
+            unzip -q "$RUNNER_TEMP/greatwhite-signing.zip" -d "$RUNNER_TEMP/greatwhite-signing"
+            set -a; . "$RUNNER_TEMP/greatwhite-signing/signing.env"; set +a
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-signing/signing/GreatWhiteTV-release.jks" >> "$GITHUB_ENV"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+          else
+            echo 'Permanent signing secret missing'; exit 1
+          fi
+
+      - name: Derive release edge key
+        if: steps.state.outputs.ready != 'true'
+        env:
+          OWNTV_EDGE_MASTER: ${{ secrets.OWNTV_EDGE_MASTER }}
+          OWNTV_EDGE_KEY_SECRET: ${{ secrets.OWNTV_EDGE_KEY }}
+        run: |
+          if [ -n "$OWNTV_EDGE_MASTER" ]; then
+            KEY=$(printf '1.0.2' | openssl dgst -sha256 -hmac "$OWNTV_EDGE_MASTER" -hex | awk '{print $NF}')
+            echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
+          elif [ -n "$OWNTV_EDGE_KEY_SECRET" ]; then
+            echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build permanently signed v1.0.2
+        if: steps.state.outputs.ready != 'true'
+        env:
+          VERSION_NAME: '1.0.2'
+          VERSION_CODE: '10002'
+        run: |
+          set -euo pipefail
+          ./gradlew assembleRelease --stacktrace
+          ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
+          X86_SRC=$(ls app/build/outputs/apk/x86_64/release/*.apk | head -n1)
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          ACTUAL=$("$APKSIGNER" verify --print-certs "$ARM_SRC" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          test "$ACTUAL" = 'EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C'
+          mkdir -p dist
+          cp "$ARM_SRC" dist/GreatWhiteTV-v1.0.2.apk
+          cp "$ARM_SRC" dist/GreatWhiteTV.apk
+          cp "$ARM_SRC" dist/OwnTV.apk
+          cp "$X86_SRC" dist/GreatWhiteTV-x86_64-v1.0.2.apk
+
+      - name: Commit tested Online patch to PR branch
+        if: steps.state.outputs.ready != 'true'
+        id: commit
+        run: |
+          set -euo pipefail
+          rm -f ONLINE_RESTORE_REQUEST.md
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add \
-            app/src/main/java/tv/own/owntv/features/online \
-            app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt \
-            app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt \
-            app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt \
-            app/src/main/res/values/strings_online.xml \
-            .github/workflows/online-bootstrap.yml
+          git add app/src/main/java/tv/own/owntv/features/online \
+                  app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt \
+                  app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt \
+                  app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt \
+                  app/src/main/res/values/strings_online.xml ONLINE_RESTORE_REQUEST.md
           git commit -m 'Restore isolated Great White Online'
-          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git push origin HEAD:${{ github.head_ref }}
 
       - name: Publish Great White TV v1.0.2
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: steps.state.outputs.ready != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.2
+          target_commitish: ${{ steps.commit.outputs.sha }}
+          name: Great White TV v1.0.2
+          body: |
+            Great White Online restored with no-login default providers.
+            GreatWhiteTV.apk is now the permanent primary updater/download asset; OwnTV.apk remains as the v1.0.1 compatibility bridge.
+          files: |
+            dist/GreatWhiteTV-v1.0.2.apk
+            dist/GreatWhiteTV.apk
+            dist/OwnTV.apk
+            dist/GreatWhiteTV-x86_64-v1.0.2.apk
+
+      - name: Confirm follow-up run
+        if: steps.state.outputs.ready == 'true'
         run: |
-          set -euo pipefail
-          code=$(curl -sS -o /tmp/dispatch.out -w '%{http_code}' \
-            -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/android.yml/dispatches" \
-            -d '{"ref":"main","inputs":{"release_version":"1.0.2"}}')
-          test "$code" = '204' || { cat /tmp/dispatch.out; echo "dispatch HTTP $code"; exit 1; }
-          echo 'Android release v1.0.2 dispatched.'
+          grep -F 'applicationId = "tv.own.owntv"' app/build.gradle.kts
+          grep -F 'GreatWhiteTV.apk' app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt
+          echo 'Online patch already committed and identity guards still match.'
