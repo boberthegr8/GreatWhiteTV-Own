@@ -19,11 +19,10 @@ import java.io.File
 import java.io.IOException
 
 /**
- * In-app updates straight from GitHub Releases: checks the repo's latest release, compares its tag
- * with the installed version, downloads the release APK, and hands it to the system installer.
- * No server of our own — the releases CI already publishes `OwnTV-vX.Y.Z.apk` (arm) and
- * `OwnTV-x86_64-vX.Y.Z.apk` per tag; the asset matching this device's ABI is chosen, so updates
- * also work on an x86_64 emulator.
+ * In-app updates straight from Great White TV's GitHub Releases: checks this repo's latest release,
+ * compares its tag with the installed version, downloads the release APK, and hands it to the
+ * system installer. The release workflow publishes a stable `OwnTV.apk` for real Android TV / Fire
+ * TV devices plus a separate x86_64 APK for emulators.
  */
 class UpdateManager(
     private val context: Context,
@@ -73,7 +72,7 @@ class UpdateManager(
 
     val currentVersion: String = BuildConfig.VERSION_NAME
 
-    /** Queries GitHub's latest release; moves to Available / UpToDate / a semantic failure. */
+    /** Queries Great White TV's latest release; moves to Available / UpToDate / a semantic failure. */
     fun check() {
         if (_state.value is State.Checking || _state.value is State.Downloading) return
         _state.value = State.Checking
@@ -82,7 +81,7 @@ class UpdateManager(
                 val request = Request.Builder()
                     .url("https://api.github.com/repos/$REPO/releases/latest")
                     .header("Accept", "application/vnd.github+json")
-                    .header("User-Agent", "OwnTV")
+                    .header("User-Agent", "GreatWhiteTV")
                     .build()
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) throw CheckHttpException(resp.code)
@@ -93,21 +92,25 @@ class UpdateManager(
                         ?: throw InvalidReleaseResponseException()
                     val notes = o.optString("body").take(16_000)
                     val assets = o.optJSONArray("assets") ?: throw InvalidReleaseResponseException()
-                    // Releases carry one APK per ABI flavor (arm = generic, x86_64 suffixed). Never
-                    // silently install an APK for the wrong ABI.
+                    // Releases carry a stable ARM APK named OwnTV.apk plus a versioned x86_64 APK.
+                    // Never silently install an APK for the wrong ABI. On ARM, prefer the permanent
+                    // stable asset so the in-app updater and Downloader URL use the exact same file.
                     val wantX86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
-                    val apkUrl = (0 until assets.length())
+                    val candidates = (0 until assets.length())
                         .asSequence()
                         .mapNotNull { assets.optJSONObject(it) }
                         .mapNotNull { asset ->
                             val name = asset.optString("name")
                             val url = asset.optString("browser_download_url")
-                            if (!name.endsWith(".apk") || url.isBlank()) return@mapNotNull null
-                            val isX86 = name.contains("x86_64", ignoreCase = true)
-                            if (isX86 == wantX86) url else null
+                            if (!name.endsWith(".apk") || url.isBlank()) null else name to url
                         }
-                        .firstOrNull()
-                        ?: throw NoCompatibleApkException()
+                        .toList()
+                    val apkUrl = if (wantX86) {
+                        candidates.firstOrNull { (name, _) -> name.contains("x86_64", ignoreCase = true) }?.second
+                    } else {
+                        candidates.firstOrNull { (name, _) -> name.equals("OwnTV.apk", ignoreCase = true) }?.second
+                            ?: candidates.firstOrNull { (name, _) -> !name.contains("x86_64", ignoreCase = true) }?.second
+                    } ?: throw NoCompatibleApkException()
                     val info = UpdateInfo(version, notes, apkUrl)
                     if (isNewer(version, currentVersion)) _state.value = State.Available(info)
                     else _state.value = State.UpToDate
@@ -126,8 +129,8 @@ class UpdateManager(
         scope.launch {
             runCatching {
                 val dir = File(context.filesDir, "updates").apply { mkdirs() }
-                val out = File(dir, "owntv-update.apk")
-                val request = Request.Builder().url(info.apkUrl).header("User-Agent", "OwnTV").build()
+                val out = File(dir, "greatwhite-tv-update.apk")
+                val request = Request.Builder().url(info.apkUrl).header("User-Agent", "GreatWhiteTV").build()
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) throw DownloadHttpException(resp.code)
                     val body = resp.body
@@ -200,6 +203,6 @@ class UpdateManager(
 
     companion object {
         private const val TAG = "UpdateManager"
-        const val REPO = "ahXN00/OwnTV"
+        const val REPO = "boberthegr8/GreatWhiteTV-Own"
     }
 }
