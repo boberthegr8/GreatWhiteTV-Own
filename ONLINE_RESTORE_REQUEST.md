@@ -1,3 +1,3 @@
-Temporary trigger for the isolated Great White Online verification. CI removes this file after the tested patch is committed.
+Temporary trigger for the isolated Great White Online commit gate.
 
-Retry after final Compose lint fix.
+Final verified restore run.
