@@ -1,8 +1,6 @@
 name: Android CI
 
-# Two jobs:
-#   check — unit tests + lint. Runs on everything, including pull requests. Gates the build.
-#   build — assembles the APK, and publishes a GitHub Release on v* tags. Never runs for a PR.
+# Tests every change, builds APKs from main, and publishes permanently signed releases.
 on:
   push:
     branches: [ main ]
@@ -10,6 +8,11 @@ on:
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version to publish (example: 1.0.2). Leave blank for a dev build."
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -63,6 +66,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+      MANUAL_VERSION: ${{ github.event.inputs.release_version || '' }}
+      IS_RELEASE: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_version != '') }}
       APK_OUT: ""
       EXPECTED_CERT_SHA256: "EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C"
     steps:
@@ -81,21 +86,33 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Compute version (from the git tag on releases)
+      - name: Compute version
         id: ver
         run: |
+          set -euo pipefail
           if [ "$IS_TAG" = "true" ]; then
             NAME="${GITHUB_REF_NAME#v}"
-            IFS='.' read -r MA MI PA <<< "$NAME"
-            CODE=$(( ${MA:-0} * 10000 + ${MI:-0} * 100 + ${PA:-0} ))
-            [ "$CODE" -gt 0 ] || CODE=1
+          elif [ -n "$MANUAL_VERSION" ]; then
+            NAME="${MANUAL_VERSION#v}"
           else
             NAME="99.99.99"
+          fi
+
+          if [ "$IS_RELEASE" = "true" ]; then
+            if ! printf '%s' "$NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Release version must be X.Y.Z, for example 1.0.2"
+              exit 1
+            fi
+            IFS='.' read -r MA MI PA <<< "$NAME"
+            CODE=$(( MA * 10000 + MI * 100 + PA ))
+            [ "$CODE" -gt 0 ] || CODE=1
+          else
             CODE=99999
           fi
+
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
           echo "code=$CODE" >> "$GITHUB_OUTPUT"
-          echo "Version: $NAME (code $CODE)"
+          echo "Version: $NAME (code $CODE); release=$IS_RELEASE"
 
       - name: Restore permanent Great White signing key
         env:
@@ -136,7 +153,7 @@ jobs:
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
             echo "Permanent signing restored from GREATWHITE_TV_SIGNING_BUNDLE."
           else
-            if [ "$IS_TAG" = "true" ]; then
+            if [ "$IS_RELEASE" = "true" ]; then
               echo "::error::Refusing to publish a Great White release without the permanent signing key."
               exit 1
             fi
@@ -155,13 +172,9 @@ jobs:
               | awk '{print $NF}')
             echo "::add-mask::$KEY"
             echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
-            echo "Derived the edge key for $VERSION_NAME."
           elif [ -n "$OWNTV_EDGE_KEY_SECRET" ]; then
             echo "::add-mask::$OWNTV_EDGE_KEY_SECRET"
             echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"
-            echo "Using the static edge key."
-          else
-            echo "No edge secret configured — app will use its open base URL."
           fi
 
       - name: Build APK
@@ -175,15 +188,12 @@ jobs:
             ./gradlew assembleRelease --stacktrace
             ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
             X86_SRC=$(ls app/build/outputs/apk/x86_64/release/*.apk | head -n1)
-            echo "Built arm:    $ARM_SRC"
-            echo "Built x86_64: $X86_SRC"
             echo "ARM_SRC=$ARM_SRC" >> "$GITHUB_ENV"
             echo "X86_SRC=$X86_SRC" >> "$GITHUB_ENV"
           else
             echo "Building debug APK"
             ./gradlew assembleDebug --stacktrace
             SRC=$(ls app/build/outputs/apk/standard/debug/*.apk | head -n1)
-            echo "Built: $SRC"
             echo "ARM_SRC=$SRC" >> "$GITHUB_ENV"
           fi
 
@@ -211,15 +221,14 @@ jobs:
       - name: Name the APK
         run: |
           mkdir -p dist
-          if [ "$IS_TAG" = "true" ]; then
+          if [ "$IS_RELEASE" = "true" ]; then
             OUT="GreatWhiteTV-v${{ steps.ver.outputs.name }}.apk"
           else
             OUT="GreatWhiteTV-dev-${GITHUB_SHA::7}.apk"
           fi
           cp "$ARM_SRC" "dist/$OUT"
           echo "APK_OUT=$OUT" >> "$GITHUB_ENV"
-          echo "Packaged dist/$OUT"
-          if [ "$IS_TAG" = "true" ]; then
+          if [ "$IS_RELEASE" = "true" ]; then
             cp "$ARM_SRC" "dist/OwnTV.apk"
             if [ -n "${X86_SRC:-}" ]; then
               cp "$X86_SRC" "dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
@@ -234,9 +243,9 @@ jobs:
           if-no-files-found: error
 
       - name: Extract release notes from CHANGELOG_APP.md
-        if: env.IS_TAG == 'true'
+        if: env.IS_RELEASE == 'true'
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: v${{ steps.ver.outputs.name }}
         run: |
           if [ -f CHANGELOG_APP.md ]; then
             awk -v ver="$TAG" '
@@ -255,10 +264,12 @@ jobs:
           cat dist/RELEASE_NOTES.md
 
       - name: Publish GitHub Release
-        if: env.IS_TAG == 'true'
+        if: env.IS_RELEASE == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          name: Great White TV ${{ github.ref_name }}
+          tag_name: v${{ steps.ver.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: Great White TV v${{ steps.ver.outputs.name }}
           files: |
             dist/${{ env.APK_OUT }}
             dist/OwnTV.apk
