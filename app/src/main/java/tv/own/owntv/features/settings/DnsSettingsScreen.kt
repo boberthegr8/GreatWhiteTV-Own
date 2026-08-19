@@ -116,27 +116,36 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
                         epg
                     }
                 }
-                // copy() is deliberate: username/password and every other provider setting remain byte-for-byte
-                // unchanged. lastSyncAt is cleared so the new endpoint is treated as requiring fresh data.
-                val updated = source.copy(url = newBase, epgUrl = movedEpgUrl, lastSyncAt = null)
+                // copy() is deliberate: username/password, source id, last-sync state and every other
+                // provider setting remain unchanged. The explicit scheduler jobs below force the refresh.
+                val updated = source.copy(url = newBase, epgUrl = movedEpgUrl)
                 sourceRepository.updateSource(updated)
 
-                // Replace any old-endpoint work, then force both catalog and guide against the new endpoint.
-                catalogSyncScheduler.cancelSync(source.id)
-                epgSyncScheduler.cancelSync(source.id)
-                val counts = importFinalizer.contentCounts(source.id)
-                catalogSyncScheduler.enqueueSync(
-                    sourceId = source.id,
-                    reason = "provider_dns_change",
-                    contentTypes = SyncContentTypes.enabledOf(updated),
-                    baseItemCount = counts.channels + counts.movies + counts.series,
-                )
-                val baseProgrammes = epgDao.countForSources(listOf(source.id))
-                epgSyncScheduler.enqueueSync(
-                    sourceId = source.id,
-                    reason = "provider_dns_change",
-                    baseProgrammes = baseProgrammes,
-                )
+                try {
+                    // Replace any old-endpoint work, then force both catalog and guide against the new endpoint.
+                    catalogSyncScheduler.cancelSync(source.id)
+                    epgSyncScheduler.cancelSync(source.id)
+                    val counts = importFinalizer.contentCounts(source.id)
+                    catalogSyncScheduler.enqueueSync(
+                        sourceId = source.id,
+                        reason = "provider_dns_change",
+                        contentTypes = SyncContentTypes.enabledOf(updated),
+                        baseItemCount = counts.channels + counts.movies + counts.series,
+                    )
+                    val baseProgrammes = epgDao.countForSources(listOf(source.id))
+                    epgSyncScheduler.enqueueSync(
+                        sourceId = source.id,
+                        reason = "provider_dns_change",
+                        baseProgrammes = baseProgrammes,
+                    )
+                } catch (error: Throwable) {
+                    // If scheduling fails after the DB write, restore the original source so the user is
+                    // never left half-switched. Cancel anything partially queued before restoring it.
+                    catalogSyncScheduler.cancelSync(source.id)
+                    epgSyncScheduler.cancelSync(source.id)
+                    runCatching { sourceRepository.updateSource(source) }
+                    throw error
+                }
                 updated
             }.onSuccess { updated ->
                 providerServer = updated.url
