@@ -14,4 +14,6 @@
     <string name="settings_provider_dns_failed">Could not complete the DNS change.</string>
     <string name="settings_provider_dns_advanced">Advanced network DNS</string>
     <string name="settings_provider_dns_advanced_note">These controls change how Great White resolves internet addresses. They do not change your IPTV provider server.</string>
+    <string name="settings_provider_dns_root_title">Change DNS</string>
+    <string name="settings_provider_dns_root_description">Only use this if you are told to. Keeps the username and password the same, then refreshes the playlist and EPG.</string>
 </resources>
