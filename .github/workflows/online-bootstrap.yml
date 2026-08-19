@@ -22,8 +22,7 @@ jobs:
       - name: Detect already-patched follow-up run
         id: state
         run: |
-          if [ -f app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt ] && \
-             grep -q 'ONLINE(tv.own.owntv.R.string.common_nav_online)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt; then
+          if [ -f app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt ] && grep -q 'ONLINE(tv.own.owntv.R.string.common_nav_online)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt; then
             echo 'ready=true' >> "$GITHUB_OUTPUT"
           else
             echo 'ready=false' >> "$GITHUB_OUTPUT"
@@ -44,7 +43,7 @@ jobs:
         if: steps.state.outputs.ready != 'true'
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Bring back only the isolated Online feature
+      - name: Restore isolated Online source files
         if: steps.state.outputs.ready != 'true'
         run: |
           set -euo pipefail
@@ -54,7 +53,7 @@ jobs:
             app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt \
             app/src/main/java/tv/own/owntv/features/online/StremioAddonClient.kt
 
-      - name: Patch current navigation only
+      - name: Patch Online into current main navigation
         if: steps.state.outputs.ready != 'true'
         run: |
           python3 - <<'PY'
@@ -71,12 +70,16 @@ jobs:
           online = 'app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt'
           replace_once(online, 'import androidx.compose.foundation.layout.weight\n', '')
           replace_once(online,
+              '    val context = LocalContext.current\n    val colors = OwnTVTheme.colors',
+              '    val context = LocalContext.current\n    val externalOpenFailedText = stringResource(R.string.online_external_open_failed)\n    val colors = OwnTVTheme.colors')
+          replace_once(online,
+              '                                                    context.getString(R.string.online_external_open_failed),',
+              '                                                    externalOpenFailedText,')
+          replace_once(online,
               '''        ) {\n            Column(Modifier.weight(1f)) {\n                Text(\n                    text = stringResource(R.string.online_title),''',
               '''        ) {\n            Column(Modifier.fillMaxWidth(0.46f)) {\n                Text(\n                    text = stringResource(R.string.online_title),''')
-          replace_once(online, '                            modifier = Modifier.weight(0.9f).fillMaxHeight(),',
-                                '                            modifier = Modifier.fillMaxWidth(0.40f).fillMaxHeight(),')
-          replace_once(online, '                            modifier = Modifier.weight(1.25f).fillMaxHeight(),',
-                                '                            modifier = Modifier.fillMaxWidth(0.58f).fillMaxHeight(),')
+          replace_once(online, '                            modifier = Modifier.weight(0.9f).fillMaxHeight(),', '                            modifier = Modifier.fillMaxWidth(0.40f).fillMaxHeight(),')
+          replace_once(online, '                            modifier = Modifier.weight(1.25f).fillMaxHeight(),', '                            modifier = Modifier.fillMaxWidth(0.58f).fillMaxHeight(),')
           replace_once(online,
               '''                    Column(Modifier.weight(1f)) {\n                        Text(addon.name,''',
               '''                    Column(Modifier.fillMaxWidth(0.72f)) {\n                        Text(addon.name,''')
@@ -88,26 +91,18 @@ jobs:
           replace_once(shell_vm,
               'val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, DOWNLOADS, EPG)',
               'val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, ONLINE, DOWNLOADS, EPG)')
-          replace_once(shell_vm,
-              '            add(HOME)\n            if (hasLive)',
-              '            add(HOME)\n            add(ONLINE)\n            if (hasLive)')
+          replace_once(shell_vm, '            add(HOME)\n            if (hasLive)', '            add(HOME)\n            add(ONLINE)\n            if (hasLive)')
 
           shell = 'app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt'
-          replace_once(shell,
-              'import tv.own.owntv.features.movies.MovieViewModel\n',
-              'import tv.own.owntv.features.movies.MovieViewModel\nimport tv.own.owntv.features.online.OnlineScreen\n')
+          replace_once(shell, 'import tv.own.owntv.features.movies.MovieViewModel\n', 'import tv.own.owntv.features.movies.MovieViewModel\nimport tv.own.owntv.features.online.OnlineScreen\n')
           replace_once(shell,
               '''                        selectedSection == MainSection.DOWNLOADS -> DownloadsScreen(\n                            onFullscreen = { openFullscreen() },''',
               '''                        selectedSection == MainSection.ONLINE -> OnlineScreen(\n                            onPlayDirect = { item, episode, url ->\n                                val displayTitle = episode?.let { "${item.name} · ${it.title}" } ?: item.name\n                                player.play(\n                                    url,\n                                    title = displayTitle,\n                                    year = item.year,\n                                    isLive = false,\n                                    contentKey = "ONLINE:${item.type}:${episode?.id ?: item.id}",\n                                )\n                                openFullscreen(MainSection.ONLINE)\n                            },\n                            onChildFocused = { focusedLayer = ShellLayer.CONTENT },\n                            modifier = Modifier.fillMaxSize(),\n                        )\n\n                        selectedSection == MainSection.DOWNLOADS -> DownloadsScreen(\n                            onFullscreen = { openFullscreen() },''')
           replace_once(shell,
               '        MainSection.SERIES -> OwnTVIcon.SERIES\n        MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS',
               '        MainSection.SERIES -> OwnTVIcon.SERIES\n        MainSection.ONLINE -> OwnTVIcon.MOVIES\n        MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS')
-          replace_once(shell,
-              '    MainSection.EPG -> emptyList()\n    MainSection.LIVE_TV -> listOf(',
-              '    MainSection.EPG -> emptyList()\n    MainSection.ONLINE -> emptyList()\n    MainSection.LIVE_TV -> listOf(')
-          replace_once(shell,
-              '    MainSection.SEARCH, MainSection.HOME, MainSection.EPG, MainSection.SETTINGS -> ""',
-              '    MainSection.SEARCH, MainSection.HOME, MainSection.ONLINE, MainSection.EPG, MainSection.SETTINGS -> ""')
+          replace_once(shell, '    MainSection.EPG -> emptyList()\n    MainSection.LIVE_TV -> listOf(', '    MainSection.EPG -> emptyList()\n    MainSection.ONLINE -> emptyList()\n    MainSection.LIVE_TV -> listOf(')
+          replace_once(shell, '    MainSection.SEARCH, MainSection.HOME, MainSection.EPG, MainSection.SETTINGS -> ""', '    MainSection.SEARCH, MainSection.HOME, MainSection.ONLINE, MainSection.EPG, MainSection.SETTINGS -> ""')
 
           icon = 'app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt'
           replace_once(icon, '            MainSection.MOVIES -> {', '            MainSection.MOVIES, MainSection.ONLINE -> {')
@@ -126,23 +121,15 @@ jobs:
           python3 - <<'PY'
           import importlib.util
           from pathlib import Path
-
-          checker_path = Path('tools/i18n/check_hardcoded_strings.py')
-          spec = importlib.util.spec_from_file_location('i18n_checker', checker_path)
-          checker = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(checker)
-
-          current = checker._inventory()
-          safe, categories, errors = checker._safe_entries()
-          if errors:
-              raise SystemExit('\n'.join(errors))
-
+          p = Path('tools/i18n/check_hardcoded_strings.py')
+          spec = importlib.util.spec_from_file_location('i18n_checker', p)
+          c = importlib.util.module_from_spec(spec); spec.loader.exec_module(c)
+          current = c._inventory(); safe, categories, errors = c._safe_entries()
+          if errors: raise SystemExit('\n'.join(errors))
           entries = {}
           for key, count in safe.items():
               actual = current.get(key, 0)
-              if actual > 0:
-                  entries[key] = (min(count, actual), categories[key])
-
+              if actual > 0: entries[key] = (min(count, actual), categories[key])
           technical_paths = {
               'app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt',
               'app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt',
@@ -150,20 +137,14 @@ jobs:
               'app/src/main/java/tv/own/owntv/features/online/StremioAddonClient.kt',
           }
           shell_path = 'app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt'
-          shell_technical = {
-              '${item.name} · ${it.title}',
-              'ONLINE:${item.type}:${episode?.id ?: item.id}',
-          }
-
+          shell_technical = {'${item.name} · ${it.title}', 'ONLINE:${item.type}:${episode?.id ?: item.id}'}
           for key, count in current.items():
               path, text = key
               if path in technical_paths or (path == shell_path and text in shell_technical):
                   entries[key] = (count, 'empty' if text == '' else 'technical')
-
-          checker.SAFE_MANIFEST.write_text(checker._serialize_safe(entries), encoding='utf-8')
-          safe_counts = {key: count for key, (count, _category) in entries.items()}
-          baseline = checker._subtract_counts(current, safe_counts)
-          checker.BASELINE.write_text(checker._serialize(baseline), encoding='utf-8')
+          c.SAFE_MANIFEST.write_text(c._serialize_safe(entries), encoding='utf-8')
+          safe_counts = {k: n for k, (n, _cat) in entries.items()}
+          c.BASELINE.write_text(c._serialize(c._subtract_counts(current, safe_counts)), encoding='utf-8')
           PY
           python3 tools/i18n/check_hardcoded_strings.py verify --bootstrap
 
@@ -201,8 +182,7 @@ jobs:
           if [ -n "$KEYSTORE_BASE64" ]; then
             test -n "$KEYSTORE_PASSWORD_SECRET"; test -n "$KEY_ALIAS_SECRET"; test -n "$KEY_PASSWORD_SECRET"
             printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
-            echo "::add-mask::$KEYSTORE_PASSWORD_SECRET"
-            echo "::add-mask::$KEY_PASSWORD_SECRET"
+            echo "::add-mask::$KEYSTORE_PASSWORD_SECRET"; echo "::add-mask::$KEY_PASSWORD_SECRET"
             echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
             echo "KEY_ALIAS=$KEY_ALIAS_SECRET" >> "$GITHUB_ENV"
@@ -214,8 +194,7 @@ jobs:
             test -s "$RUNNER_TEMP/greatwhite-signing/signing/GreatWhiteTV-release.jks"
             test -s "$RUNNER_TEMP/greatwhite-signing/signing.env"
             set -a; . "$RUNNER_TEMP/greatwhite-signing/signing.env"; set +a
-            echo "::add-mask::$KEYSTORE_PASSWORD"
-            echo "::add-mask::$KEY_PASSWORD"
+            echo "::add-mask::$KEYSTORE_PASSWORD"; echo "::add-mask::$KEY_PASSWORD"
             echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-signing/signing/GreatWhiteTV-release.jks" >> "$GITHUB_ENV"
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
             echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
@@ -232,11 +211,9 @@ jobs:
         run: |
           if [ -n "$OWNTV_EDGE_MASTER" ]; then
             KEY=$(printf '1.0.2' | openssl dgst -sha256 -hmac "$OWNTV_EDGE_MASTER" -hex | awk '{print $NF}')
-            echo "::add-mask::$KEY"
-            echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
+            echo "::add-mask::$KEY"; echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
           elif [ -n "$OWNTV_EDGE_KEY_SECRET" ]; then
-            echo "::add-mask::$OWNTV_EDGE_KEY_SECRET"
-            echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"
+            echo "::add-mask::$OWNTV_EDGE_KEY_SECRET"; echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"
           fi
 
       - name: Build permanently signed v1.0.2
