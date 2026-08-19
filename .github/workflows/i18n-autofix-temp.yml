@@ -1,20 +1,20 @@
 name: Temporary i18n autofix
 
 on:
-  push:
+  pull_request:
     branches: [ main ]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   fix:
-    if: github.event.head_commit.message == 'Run temporary i18n autofix'
+    if: github.head_ref == 'agent/i18n-autofix'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/i18n-autofix
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -99,14 +99,12 @@ jobs:
           python3 tools/i18n/check_hardcoded_strings.py verify --bootstrap
           python3 tools/i18n/gen_supported_locales.py check
           python3 tools/i18n/validate_strings.py --report text
-      - name: Commit generated files to disposable branch
-        run: |
-          if git diff --quiet; then
-            echo "No generated changes"
-            exit 0
-          fi
-          git config user.name "Great White CI"
-          git config user.email "actions@users.noreply.github.com"
-          git add tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt app/src/main/java/tv/own/owntv/core/i18n/SupportedLocales.kt
-          git commit -m "Refresh i18n generated files [skip ci]"
-          git push origin HEAD:agent/i18n-autofix
+      - name: Upload generated files
+        uses: actions/upload-artifact@v4
+        with:
+          name: greatwhite-i18n-generated
+          path: |
+            tools/i18n/safe_literals.txt
+            tools/i18n/hardcoded_baseline.txt
+            app/src/main/java/tv/own/owntv/core/i18n/SupportedLocales.kt
+          if-no-files-found: error
