@@ -1,0 +1,4 @@
+version=1.0.10
+run_id=32219866438
+apk_cert_sha256=unavailable
+public_urls_ok=false
