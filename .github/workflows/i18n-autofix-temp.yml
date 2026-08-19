@@ -3,12 +3,15 @@ name: Temporary i18n autofix
 on:
   push:
     branches: [ "agent/i18n-autofix" ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: write
 
 jobs:
   fix:
+    if: github.event_name == 'push' || github.head_ref == 'agent/i18n-autofix'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -77,7 +80,7 @@ jobs:
                   category = 'format'
               elif text == 'UNUSED_PARAMETER':
                   category = 'library'
-              elif text == 'provider_dns_change' or text == 'greatwhite.publicdomain':
+              elif text in {'provider_dns_change', 'greatwhite.publicdomain'}:
                   category = 'id'
               elif path.endswith('UpdateManager.kt') and 'failed' in text:
                   category = 'log'
