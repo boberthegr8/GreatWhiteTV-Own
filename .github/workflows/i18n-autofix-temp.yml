@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   fix:
@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: agent/i18n-autofix
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -36,7 +36,6 @@ jobs:
           if errors:
               raise SystemExit('\n'.join(errors))
 
-          # Remove stale safe classifications first.
           safe = {
               key: min(count, current.get(key, 0))
               for key, count in safe.items()
@@ -78,8 +77,6 @@ jobs:
               elif text in {'provider_dns_change', 'greatwhite.publicdomain'}:
                   category = 'protocol'
               else:
-                  # Reviewed implementation-only values: JSON/API keys, protocol fragments, format
-                  # tokens, provider identifiers, user-agent values and other non-UI literals.
                   category = 'technical'
               categories[key] = category
 
@@ -104,3 +101,14 @@ jobs:
             tools/i18n/hardcoded_baseline.txt
             app/src/main/java/tv/own/owntv/core/i18n/SupportedLocales.kt
           if-no-files-found: error
+      - name: Commit generated files to disposable branch
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "Great White CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt app/src/main/java/tv/own/owntv/core/i18n/SupportedLocales.kt
+          git commit -m "Refresh i18n generated files [skip ci]"
+          git push origin HEAD:agent/i18n-autofix
