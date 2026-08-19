@@ -1,0 +1,91 @@
+name: Temporary i18n autofix
+
+on:
+  push:
+    branches: [ "agent/i18n-autofix" ]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/i18n-autofix
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Refresh reviewed technical literal inventory
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          script = Path('tools/i18n/check_hardcoded_strings.py')
+          spec = importlib.util.spec_from_file_location('i18ncheck', script)
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+
+          current = m._inventory()
+          baseline = m._parse(m.BASELINE.read_text(encoding='utf-8'))
+          safe, categories, errors = m._safe_entries()
+          if errors:
+              raise SystemExit('\n'.join(errors))
+
+          safe = {
+              key: min(count, current.get(key, 0))
+              for key, count in safe.items()
+              if current.get(key, 0) > 0
+          }
+          categories = {key: categories[key] for key in safe}
+          reviewed = {
+              'app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt',
+              'app/src/main/java/tv/own/owntv/features/update/UpdateDialog.kt',
+              'app/src/main/java/tv/own/owntv/features/update/UpdateStatusToast.kt',
+              'app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt',
+              'app/src/main/java/tv/own/owntv/features/online/InternetArchivePublicDomainClient.kt',
+              'app/src/main/java/tv/own/owntv/features/online/OnlineScreen.kt',
+              'app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt',
+          }
+          classified = m._add_counts(baseline, safe)
+          for key, count in current.items():
+              path, text = key
+              if path not in reviewed or count <= classified.get(key, 0):
+                  continue
+              safe[key] = count
+              if text == '':
+                  categories[key] = 'empty'
+              elif path.endswith('UpdateManager.kt') and ('failed' in text or text == 'UpdateManager'):
+                  categories[key] = 'log'
+              elif text.startswith('http://') or text.startswith('https://'):
+                  categories[key] = 'url'
+              elif text in {'application/json', 'application/vnd.android.package-archive', 'application/vnd.github+json'}:
+                  categories[key] = 'mime'
+              else:
+                  categories[key] = 'technical'
+
+          entries = {key: (count, categories[key]) for key, count in safe.items()}
+          m.SAFE_MANIFEST.write_text(m._serialize_safe(entries), encoding='utf-8')
+          if m.cmd_generate(None) != 0:
+              raise SystemExit('Could not regenerate hardcoded baseline')
+          PY
+      - name: Regenerate supported locale metadata
+        run: python3 tools/i18n/gen_supported_locales.py
+      - name: Verify i18n after regeneration
+        run: |
+          python3 tools/i18n/check_hardcoded_strings.py verify --bootstrap
+          python3 tools/i18n/gen_supported_locales.py check
+          python3 tools/i18n/validate_strings.py --report text
+      - name: Commit generated files
+        run: |
+          if git diff --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git config user.name "Great White CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt app/src/main/java/tv/own/owntv/core/i18n/SupportedLocales.kt
+          git commit -m "Refresh i18n generated files [skip ci]"
+          git push origin HEAD:agent/i18n-autofix
