@@ -36,12 +36,14 @@ jobs:
           if errors:
               raise SystemExit('\n'.join(errors))
 
+          # Remove stale safe classifications first.
           safe = {
               key: min(count, current.get(key, 0))
               for key, count in safe.items()
               if current.get(key, 0) > 0
           }
           categories = {key: categories[key] for key in safe}
+
           reviewed = {
               'app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt',
               'app/src/main/java/tv/own/owntv/features/update/UpdateDialog.kt',
@@ -57,8 +59,6 @@ jobs:
               'application/vnd.android.package-archive',
               'application/vnd.github+json',
           }
-          header_values = {'Accept', 'User-Agent', 'GreatWhiteTV', 'GreatWhiteOnline/1'}
-          format_values = {'"', '\\', '\\"', '\\\\', '%20', '%2F', '+', '/', '.mp4', '.m4v', 'mpeg4', 'mpeg-4', 'h.264'}
 
           for key, count in current.items():
               path, text = key
@@ -69,22 +69,18 @@ jobs:
                   category = 'empty'
               elif text in mime_values:
                   category = 'mime'
-              elif text in header_values:
-                  category = 'header'
               elif text.startswith('http://') or text.startswith('https://'):
                   category = 'url'
-              elif text in {'http://', 'https://'}:
-                  category = 'protocol'
-              elif text in format_values:
-                  category = 'format'
               elif text == 'UNUSED_PARAMETER':
-                  category = 'library'
-              elif text in {'provider_dns_change', 'greatwhite.publicdomain'}:
-                  category = 'id'
+                  category = 'compiler'
               elif path.endswith('UpdateManager.kt') and 'failed' in text:
                   category = 'log'
+              elif text in {'provider_dns_change', 'greatwhite.publicdomain'}:
+                  category = 'protocol'
               else:
-                  category = 'api'
+                  # Reviewed implementation-only values: JSON/API keys, protocol fragments, format
+                  # tokens, provider identifiers, user-agent values and other non-UI literals.
+                  category = 'technical'
               categories[key] = category
 
           entries = {key: (count, categories[key]) for key, count in safe.items()}
