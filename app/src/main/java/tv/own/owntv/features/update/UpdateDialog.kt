@@ -50,9 +50,9 @@ import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
- * The in-app update dialog (used both from Settings → Check for updates and the automatic prompt).
- * Binds to [UpdateManager]'s state machine: checking → up-to-date / available → downloading.
- * [checkOnOpen] makes opening the dialog trigger a fresh check (the Settings path).
+ * Great White's manual in-app update dialog. Opening it from Settings → Check for updates performs
+ * the only release check the app is allowed to make. There is deliberately no automatic/startup
+ * update path: customers are never interrupted by a new release unless they explicitly ask for it.
  */
 @Composable
 fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
@@ -62,7 +62,7 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
     val focus = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        if (checkOnOpen) manager.check()
+        if (checkOnOpen) manager.checkManual()
     }
     LaunchedEffect(state) {
         if (state is UpdateManager.State.Available || state is UpdateManager.State.UpToDate || state is UpdateManager.State.Failed) {
@@ -110,7 +110,6 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
                             renderReleaseNotes(s.info.notes, headingColor = colors.onSurface),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
-                            // Cap to the screen (minus dialog chrome) so the Update/Later buttons stay reachable.
                             modifier = Modifier
                                 .heightIn(max = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - 260.dp).coerceIn(120.dp, 320.dp))
                                 .verticalScroll(rememberScrollState()),
@@ -153,12 +152,6 @@ fun UpdateDialog(onDismiss: () -> Unit, checkOnOpen: Boolean = false) {
     }
 }
 
-/**
- * Renders the minimal release notes (from CHANGELOG_APP.md, via the GitHub release body) for the update
- * dialog. Lightweight Markdown only — enough for our bullet-only format: `### ` section headers become
- * bold heading lines, `- ` bullets become "• ", and inline `**bold**` spans render bold. Everything else
- * is shown as-is. Not a full Markdown parser.
- */
 private fun renderReleaseNotes(notes: String, headingColor: Color): AnnotatedString = buildAnnotatedString {
     val lines = notes.replace("\r\n", "\n").trim().split("\n")
     lines.forEachIndexed { index, raw ->
@@ -180,7 +173,6 @@ private fun renderReleaseNotes(notes: String, headingColor: Color): AnnotatedStr
     }
 }
 
-/** Appends [text], turning `**bold**` spans into actual bold runs (leaves other characters untouched). */
 private fun AnnotatedString.Builder.appendInline(text: String) {
     var i = 0
     while (i < text.length) {
