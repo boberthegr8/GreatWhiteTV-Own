@@ -229,9 +229,13 @@ jobs:
           cp "$ARM_SRC" "dist/$OUT"
           echo "APK_OUT=$OUT" >> "$GITHUB_ENV"
           if [ "$IS_RELEASE" = "true" ]; then
+            # Permanent public/download/updater filename from this point forward.
+            cp "$ARM_SRC" "dist/GreatWhiteTV.apk"
+            # Legacy bridge: v1.0.1's updater prefers OwnTV.apk. Keep this alias so installed
+            # v1.0.1 boxes can update in place to the first GreatWhiteTV.apk-based release.
             cp "$ARM_SRC" "dist/OwnTV.apk"
             if [ -n "${X86_SRC:-}" ]; then
-              cp "$X86_SRC" "dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
+              cp "$X86_SRC" "dist/GreatWhiteTV-x86_64-v${{ steps.ver.outputs.name }}.apk"
             fi
           fi
 
@@ -272,7 +276,8 @@ jobs:
           name: Great White TV v${{ steps.ver.outputs.name }}
           files: |
             dist/${{ env.APK_OUT }}
+            dist/GreatWhiteTV.apk
             dist/OwnTV.apk
-            dist/OwnTV-x86_64-v${{ steps.ver.outputs.name }}.apk
+            dist/GreatWhiteTV-x86_64-v${{ steps.ver.outputs.name }}.apk
           body_path: dist/RELEASE_NOTES.md
           generate_release_notes: false
