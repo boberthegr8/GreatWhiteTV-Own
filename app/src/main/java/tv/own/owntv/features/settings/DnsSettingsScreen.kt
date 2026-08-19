@@ -1,5 +1,6 @@
 package tv.own.owntv.features.settings
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,11 +29,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.koin.androidx.compose.koinViewModel
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 import tv.own.owntv.R
+import tv.own.owntv.core.database.dao.EpgDao
+import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.core.network.DohPresets
+import tv.own.owntv.core.repository.SourceRepository
+import tv.own.owntv.core.sync.ImportFinalizer
+import tv.own.owntv.core.sync.SyncContentTypes
+import tv.own.owntv.core.sync.work.CatalogSyncScheduler
+import tv.own.owntv.core.sync.work.EpgSyncScheduler
 import tv.own.owntv.ui.components.OwnTVButton
 import tv.own.owntv.ui.components.OwnTVButtonStyle
 import tv.own.owntv.ui.components.OwnTVIcon
@@ -39,10 +50,102 @@ import tv.own.owntv.ui.components.OwnTVTextField
 import tv.own.owntv.ui.components.roundedPanel
 import tv.own.owntv.ui.theme.OwnTVTheme
 
+private enum class ProviderDnsStatus { IDLE, INVALID, APPLYING, SUCCESS, FAILED }
+
 @Composable
 fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val colors = OwnTVTheme.colors
     val vm: SettingsViewModel = koinViewModel()
+    val scope = rememberCoroutineScope()
+
+    // Provider-DNS dependencies are intentionally kept out of the normal IPTV browse/playback path.
+    // This screen changes one SourceEntity only after the user explicitly presses Change DNS & Refresh.
+    val sourceRepository: SourceRepository = koinInject()
+    val importFinalizer: ImportFinalizer = koinInject()
+    val catalogSyncScheduler: CatalogSyncScheduler = koinInject()
+    val epgSyncScheduler: EpgSyncScheduler = koinInject()
+    val epgDao: EpgDao = koinInject()
+
+    val sources by vm.sources.collectAsStateWithLifecycle()
+    val defaultSourceId by vm.defaultSourceId.collectAsStateWithLifecycle()
+    val xtreamSources = sources.filter { it.type == SourceType.XTREAM }
+
+    var providerSourceId by remember { mutableStateOf<Long?>(null) }
+    var providerServer by remember { mutableStateOf("") }
+    var providerStatus by remember { mutableStateOf(ProviderDnsStatus.IDLE) }
+    val providerSource = xtreamSources.firstOrNull { it.id == providerSourceId }
+
+    // Default to the active Xtream playlist, otherwise the first Xtream account. Re-sync the field only
+    // when the source itself changes in Room; ordinary typing does not touch Room and is left alone.
+    LaunchedEffect(xtreamSources.map { it.id to it.url }, defaultSourceId) {
+        val chosen = xtreamSources.firstOrNull { it.id == providerSourceId }
+            ?: xtreamSources.firstOrNull { it.id == defaultSourceId }
+            ?: xtreamSources.firstOrNull()
+        providerSourceId = chosen?.id
+        providerServer = chosen?.url.orEmpty()
+        if (providerStatus != ProviderDnsStatus.APPLYING) providerStatus = ProviderDnsStatus.IDLE
+    }
+
+    fun cycleProvider() {
+        if (xtreamSources.size <= 1) return
+        val current = xtreamSources.indexOfFirst { it.id == providerSourceId }.coerceAtLeast(0)
+        val next = xtreamSources[(current + 1) % xtreamSources.size]
+        providerSourceId = next.id
+        providerServer = next.url
+        providerStatus = ProviderDnsStatus.IDLE
+    }
+
+    fun applyProviderDns() {
+        val source = providerSource ?: return
+        val normalized = normalizeProviderServer(providerServer)
+        if (normalized == null) {
+            providerStatus = ProviderDnsStatus.INVALID
+            return
+        }
+        providerStatus = ProviderDnsStatus.APPLYING
+        scope.launch {
+            runCatching {
+                val oldBase = source.url.trim().trimEnd('/')
+                val newBase = normalized.trimEnd('/')
+                // If the user had an explicit XMLTV URL on the same old host/base, move that URL with
+                // the provider DNS too. A completely separate/manual EPG URL is deliberately untouched.
+                val movedEpgUrl = source.epgUrl?.let { epg ->
+                    if (oldBase.isNotBlank() && epg.startsWith(oldBase, ignoreCase = true)) {
+                        newBase + epg.substring(oldBase.length)
+                    } else {
+                        epg
+                    }
+                }
+                // copy() is deliberate: username/password and every other provider setting remain byte-for-byte
+                // unchanged. lastSyncAt is cleared so the new endpoint is treated as requiring fresh data.
+                val updated = source.copy(url = newBase, epgUrl = movedEpgUrl, lastSyncAt = null)
+                sourceRepository.updateSource(updated)
+
+                // Replace any old-endpoint work, then force both catalog and guide against the new endpoint.
+                catalogSyncScheduler.cancelSync(source.id)
+                epgSyncScheduler.cancelSync(source.id)
+                val counts = importFinalizer.contentCounts(source.id)
+                catalogSyncScheduler.enqueueSync(
+                    sourceId = source.id,
+                    reason = "provider_dns_change",
+                    contentTypes = SyncContentTypes.enabledOf(updated),
+                    baseItemCount = counts.channels + counts.movies + counts.series,
+                )
+                val baseProgrammes = epgDao.countForSources(listOf(source.id))
+                epgSyncScheduler.enqueueSync(
+                    sourceId = source.id,
+                    reason = "provider_dns_change",
+                    baseProgrammes = baseProgrammes,
+                )
+                updated
+            }.onSuccess { updated ->
+                providerServer = updated.url
+                providerStatus = ProviderDnsStatus.SUCCESS
+            }.onFailure {
+                providerStatus = ProviderDnsStatus.FAILED
+            }
+        }
+    }
 
     val dnsConfig by vm.dnsConfig.collectAsStateWithLifecycle()
     val dnsTestState by vm.dnsTest.collectAsStateWithLifecycle()
@@ -56,8 +159,7 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         return ""
     }
 
-    // DataStore can emit after the screen's initial empty value. Synchronize only when persisted
-    // DNS fields change so restored values do not overwrite normal editing.
+    // Existing advanced network-resolver DNS controls. These are intentionally separate from provider DNS.
     val hasServer = dnsConfig.host.isNotBlank() || dnsConfig.dohUrl.isNotBlank()
     var toggleOn by remember { mutableStateOf(dnsConfig.enabled || hasServer) }
     var server by remember { mutableStateOf(dnsToServerText(dnsConfig)) }
@@ -70,17 +172,14 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val serverConfigured = server.trim().isNotBlank()
     val effectiveEnabled = toggleOn && serverConfigured
 
-    // Toggle: ON = show fields (no persistence needed). OFF = hide fields + immediately persist disabled.
     fun applyToggle(on: Boolean) {
         toggleOn = on
         if (!on) {
-            // Immediately disable DNS — fire and forget, no waiting for response.
             vm.saveDns(enabled = false, host = "", port = 53, dohUrl = "")
             vm.resetDnsTest()
         }
     }
 
-    // Save: persist the server URL. DNS is enabled only when a server is configured.
     fun applySave() {
         val s = server.trim()
         val (host, port, doh) = if (s.startsWith("https://", ignoreCase = true)) {
@@ -99,22 +198,26 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         vm.resetDnsTest()
     }
 
+    val providerPlaylistFocus = remember { FocusRequester() }
+    val providerServerFocus = remember { FocusRequester() }
+    val providerApplyFocus = remember { FocusRequester() }
     val toggleFocus = remember { FocusRequester() }
     val firstPresetFocus = remember { FocusRequester() }
     val serverFieldFocus = remember { FocusRequester() }
     val saveFocus = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) { runCatching { toggleFocus.requestFocus() } }
-
-    // When toggle turns ON, move focus to the first preset button after layout.
-    // When toggle turns OFF, return focus to the toggle row.
-    LaunchedEffect(toggleOn) {
+    LaunchedEffect(xtreamSources.isNotEmpty()) {
         kotlinx.coroutines.delay(60)
-        if (toggleOn) {
-            runCatching { firstPresetFocus.requestFocus() }
-        } else {
-            runCatching { toggleFocus.requestFocus() }
-        }
+        if (xtreamSources.isNotEmpty()) runCatching { providerPlaylistFocus.requestFocus() }
+        else runCatching { toggleFocus.requestFocus() }
+    }
+
+    LaunchedEffect(toggleOn) {
+        if (!toggleFocus.captureFocus()) return@LaunchedEffect
+        toggleFocus.freeFocus()
+        kotlinx.coroutines.delay(60)
+        if (toggleOn) runCatching { firstPresetFocus.requestFocus() }
+        else runCatching { toggleFocus.requestFocus() }
     }
 
     BackHandler { onBack() }
@@ -123,7 +226,12 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .roundedPanel()
-            .focusProperties { onEnter = { runCatching { toggleFocus.requestFocus() } } }
+            .focusProperties {
+                onEnter = {
+                    if (xtreamSources.isNotEmpty()) runCatching { providerPlaylistFocus.requestFocus() }
+                    else runCatching { toggleFocus.requestFocus() }
+                }
+            }
             .focusGroup()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 40.dp, vertical = 28.dp),
@@ -132,7 +240,81 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         Header(stringResource(R.string.settings_dns), onBack)
         Spacer(Modifier.height(8.dp))
 
-        GroupLabel(stringResource(R.string.settings_dns_custom))
+        GroupLabel(stringResource(R.string.settings_provider_dns_title))
+        Text(
+            stringResource(R.string.settings_provider_dns_warning),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(10.dp))
+
+        if (providerSource == null) {
+            Text(
+                stringResource(R.string.settings_provider_dns_no_xtream),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant,
+            )
+        } else {
+            OwnTVButton(
+                label = stringResource(R.string.settings_provider_dns_playlist, providerSource.name),
+                onClick = ::cycleProvider,
+                style = if (xtreamSources.size > 1) OwnTVButtonStyle.PRIMARY else OwnTVButtonStyle.SECONDARY,
+                modifier = Modifier
+                    .focusRequester(providerPlaylistFocus)
+                    .focusProperties { down = providerServerFocus },
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                stringResource(R.string.settings_provider_dns_current, providerSource.url),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(10.dp))
+            OwnTVTextField(
+                value = providerServer,
+                onValueChange = {
+                    providerServer = it.take(500)
+                    providerStatus = ProviderDnsStatus.IDLE
+                },
+                label = stringResource(R.string.settings_provider_dns_server),
+                placeholder = stringResource(R.string.settings_provider_dns_hint),
+                focusRequester = providerServerFocus,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusProperties {
+                        up = providerPlaylistFocus
+                        down = providerApplyFocus
+                    },
+            )
+            Spacer(Modifier.height(12.dp))
+            OwnTVButton(
+                label = stringResource(R.string.settings_provider_dns_apply),
+                onClick = ::applyProviderDns,
+                modifier = Modifier
+                    .focusRequester(providerApplyFocus)
+                    .focusProperties {
+                        up = providerServerFocus
+                        down = toggleFocus
+                    },
+            )
+            when (providerStatus) {
+                ProviderDnsStatus.IDLE -> Unit
+                ProviderDnsStatus.INVALID -> ProviderDnsStatusText(stringResource(R.string.settings_provider_dns_invalid), isError = true)
+                ProviderDnsStatus.APPLYING -> ProviderDnsStatusText(stringResource(R.string.settings_provider_dns_applying))
+                ProviderDnsStatus.SUCCESS -> ProviderDnsStatusText(stringResource(R.string.settings_provider_dns_success))
+                ProviderDnsStatus.FAILED -> ProviderDnsStatusText(stringResource(R.string.settings_provider_dns_failed), isError = true)
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+        GroupLabel(stringResource(R.string.settings_provider_dns_advanced))
+        Text(
+            stringResource(R.string.settings_provider_dns_advanced_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+
         Row2(
             icon = OwnTVIcon.SEARCH,
             title = stringResource(R.string.settings_dns_use_custom),
@@ -141,11 +323,13 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             primaryChip = effectiveEnabled,
             modifier = Modifier
                 .focusRequester(toggleFocus)
-                .focusProperties { if (toggleOn) down = firstPresetFocus },
+                .focusProperties {
+                    if (providerSource != null) up = providerApplyFocus
+                    if (toggleOn) down = firstPresetFocus
+                },
             onClick = { applyToggle(!toggleOn) },
         )
 
-        // Red warning: toggle is on but no server configured
         if (toggleOn && !serverConfigured) {
             Spacer(Modifier.height(8.dp))
             Text(
@@ -155,14 +339,9 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             )
         }
 
-        // Simple conditional visibility — AnimatedVisibility interferes with D-pad focus on TV.
         if (toggleOn) {
             Column {
                 Spacer(Modifier.height(12.dp))
-
-                // DoH preset chips — first chip gets focus when toggle turns on.
-                // Explicit vertical links: the 2D focus search otherwise jumps straight from the
-                // preset row to the header / Save, skipping the toggle above and the field below.
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.focusProperties {
@@ -243,6 +422,26 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
             color = colors.onSurfaceVariant,
         )
     }
+}
+
+private fun normalizeProviderServer(raw: String): String? {
+    val trimmed = raw.trim().trimEnd('/')
+    if (trimmed.isBlank()) return null
+    val candidate = if (trimmed.contains("://")) trimmed else "http://$trimmed"
+    val uri = runCatching { Uri.parse(candidate) }.getOrNull() ?: return null
+    val validScheme = uri.scheme.equals("http", ignoreCase = true) || uri.scheme.equals("https", ignoreCase = true)
+    if (!validScheme || uri.host.isNullOrBlank()) return null
+    return candidate.trimEnd('/')
+}
+
+@Composable
+private fun ProviderDnsStatusText(text: String, isError: Boolean = false) {
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (isError) Color(0xFFEF4444) else OwnTVTheme.colors.primary,
+    )
 }
 
 @Composable
