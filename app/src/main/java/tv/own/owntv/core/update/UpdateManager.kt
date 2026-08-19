@@ -19,10 +19,10 @@ import java.io.File
 import java.io.IOException
 
 /**
- * In-app updates straight from Great White TV's GitHub Releases: checks this repo's latest release,
- * compares its tag with the installed version, downloads the release APK, and hands it to the
- * system installer. The release workflow publishes a stable `GreatWhiteTV.apk` for real Android TV /
- * Fire TV devices plus a separate x86_64 APK for emulators.
+ * Manual in-app updates straight from Great White TV's GitHub Releases: checks this repo's latest
+ * release only when the user explicitly asks, compares its tag with the installed version, downloads
+ * the release APK, and hands it to the system installer. The release workflow publishes a stable
+ * `GreatWhiteTV.apk` for real Android TV / Fire TV devices plus a separate x86_64 APK for emulators.
  */
 class UpdateManager(
     private val context: Context,
@@ -72,8 +72,18 @@ class UpdateManager(
 
     val currentVersion: String = BuildConfig.VERSION_NAME
 
-    /** Queries Great White TV's latest release; moves to Available / UpToDate / a semantic failure. */
+    /**
+     * Legacy startup hook retained so an older shell/settings preference cannot trigger an update check.
+     * Great White updates are manual-only: callers that represent an explicit user action must use
+     * [checkManual]. Keeping this method as a no-op also disables auto-checks for users whose old
+     * `check on start` preference is still stored as true after upgrading.
+     */
     fun check() {
+        reset()
+    }
+
+    /** Queries Great White TV's latest release after an explicit user action. */
+    fun checkManual() {
         if (_state.value is State.Checking || _state.value is State.Downloading) return
         _state.value = State.Checking
         scope.launch {
@@ -117,7 +127,7 @@ class UpdateManager(
                     else _state.value = State.UpToDate
                 }
             }.onFailure { error ->
-                Log.w(TAG, "update check failed: ${error.message}", error)
+                Log.w(TAG, "manual update check failed: ${error.message}", error)
                 _state.value = State.Failed(failureFor(error, checking = true))
             }
         }
@@ -180,7 +190,7 @@ class UpdateManager(
             _state.value = State.Available(info)
             downloadAndInstall()
         } else {
-            check()
+            checkManual()
         }
     }
 
