@@ -50,21 +50,40 @@ jobs:
               'app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt',
           }
           classified = m._add_counts(baseline, safe)
+          mime_values = {
+              'application/json',
+              'application/vnd.android.package-archive',
+              'application/vnd.github+json',
+          }
+          header_values = {'Accept', 'User-Agent', 'GreatWhiteTV', 'GreatWhiteOnline/1'}
+          format_values = {'"', '\\', '\\"', '\\\\', '%20', '%2F', '+', '/', '.mp4', '.m4v', 'mpeg4', 'mpeg-4', 'h.264'}
+
           for key, count in current.items():
               path, text = key
               if path not in reviewed or count <= classified.get(key, 0):
                   continue
               safe[key] = count
               if text == '':
-                  categories[key] = 'empty'
-              elif path.endswith('UpdateManager.kt') and ('failed' in text or text == 'UpdateManager'):
-                  categories[key] = 'log'
+                  category = 'empty'
+              elif text in mime_values:
+                  category = 'mime'
+              elif text in header_values:
+                  category = 'header'
               elif text.startswith('http://') or text.startswith('https://'):
-                  categories[key] = 'url'
-              elif text in {'application/json', 'application/vnd.android.package-archive', 'application/vnd.github+json'}:
-                  categories[key] = 'mime'
+                  category = 'url'
+              elif text in {'http://', 'https://'}:
+                  category = 'protocol'
+              elif text in format_values:
+                  category = 'format'
+              elif text == 'UNUSED_PARAMETER':
+                  category = 'library'
+              elif text == 'provider_dns_change' or text == 'greatwhite.publicdomain':
+                  category = 'id'
+              elif path.endswith('UpdateManager.kt') and 'failed' in text:
+                  category = 'log'
               else:
-                  categories[key] = 'technical'
+                  category = 'api'
+              categories[key] = category
 
           entries = {key: (count, categories[key]) for key, count in safe.items()}
           m.SAFE_MANIFEST.write_text(m._serialize_safe(entries), encoding='utf-8')
