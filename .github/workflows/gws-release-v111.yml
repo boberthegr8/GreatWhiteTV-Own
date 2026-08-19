@@ -1,16 +1,16 @@
-name: GWS Online v1.0.12 verified release
+name: GWS Online v1.0.12 final verified release
 
 on:
   push:
     branches: [ main ]
     paths:
-      - '.github/GWS_V112_SECRET_TRIGGER'
+      - '.github/GWS_V112_FINAL_TRIGGER'
 
 permissions:
   contents: write
 
 concurrency:
-  group: gws-release-v112
+  group: gws-release-v112-final
   cancel-in-progress: false
 
 env:
@@ -41,7 +41,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Verify GWS v1.0.12 source invariants
+      - name: Verify GWS source invariants
         run: |
           set -euo pipefail
           grep -Fq 'val RailWidthFixed = 180.dp' app/src/main/java/tv/own/owntv/ui/theme/Dimens.kt
@@ -53,9 +53,9 @@ jobs:
             echo '::error::Forced Android TV banner returned; refusing to publish.'
             exit 1
           fi
-          echo 'GWS layout, label, launcher behavior and Online defaults verified.'
+          echo 'Approved 180/450 layout, GWS Online label, launcher behavior and Online defaults verified.'
 
-      - name: Verify Online catalog endpoints
+      - name: Verify Online endpoints
         run: |
           set -euo pipefail
           curl -fsSL --connect-timeout 15 --max-time 45 -A 'GWSOnline/1.0.12' https://v3-cinemeta.strem.io/manifest.json -o /tmp/cinemeta.json
@@ -64,60 +64,71 @@ jobs:
           grep -Fq 'org.stremio.watchhub' /tmp/watchhub.json
           echo 'Online catalog and WatchHub endpoints reachable.'
 
-      - name: Restore and verify permanent GWS signing key
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}
-          GREATWHITE_TV_SIGNING_BUNDLE: ${{ secrets.GREATWHITE_TV_SIGNING_BUNDLE }}
+      - name: Publish one-time signing handoff key
         run: |
           set -euo pipefail
-          KEYSTORE_FILE_LOCAL=''
-          STORE_PASS=''
-          ALIAS=''
-          KEY_PASS=''
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /tmp/gws_private.pem 2>/dev/null
+          openssl pkey -in /tmp/gws_private.pem -pubout -out /tmp/gws_public.pem 2>/dev/null
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p .github/gws-handoff
+          cp /tmp/gws_public.pem ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem"
+          printf '%s\n' "$GITHUB_RUN_ID" > .github/GWS_V112_FINAL_ACTIVE_RUN.txt
+          git config user.name 'GWS Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .github/gws-handoff .github/GWS_V112_FINAL_ACTIVE_RUN.txt
+          git commit -m "Publish GWS v1.0.12 one-time signing key for run ${GITHUB_RUN_ID} [skip ci]"
+          git push origin HEAD:main
 
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            test -n "$KEYSTORE_PASSWORD_SECRET"
-            test -n "$KEY_ALIAS_SECRET"
-            test -n "$KEY_PASSWORD_SECRET"
-            KEYSTORE_FILE_LOCAL="$RUNNER_TEMP/release.keystore"
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_FILE_LOCAL"
-            STORE_PASS="$KEYSTORE_PASSWORD_SECRET"
-            ALIAS="$KEY_ALIAS_SECRET"
-            KEY_PASS="$KEY_PASSWORD_SECRET"
-            echo 'Permanent signing restored from repository keystore secrets.'
-          elif [ -n "$GREATWHITE_TV_SIGNING_BUNDLE" ]; then
-            mkdir -p "$RUNNER_TEMP/gws-signing"
-            printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/gws-signing.zip"
-            unzip -q "$RUNNER_TEMP/gws-signing.zip" -d "$RUNNER_TEMP/gws-signing"
-            test -s "$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks"
-            test -s "$RUNNER_TEMP/gws-signing/signing.env"
-            set -a
-            . "$RUNNER_TEMP/gws-signing/signing.env"
-            set +a
-            KEYSTORE_FILE_LOCAL="$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks"
-            STORE_PASS="$KEYSTORE_PASSWORD"
-            ALIAS="$KEY_ALIAS"
-            KEY_PASS="$KEY_PASSWORD"
-            echo 'Permanent signing restored from repository compatibility bundle.'
-          else
-            echo '::error::Permanent GWS signing secret is not configured.'
-            exit 1
-          fi
+      - name: Wait for encrypted signing bundle
+        run: |
+          set -euo pipefail
+          found=0
+          for i in $(seq 1 240); do
+            git fetch -q origin main
+            P=".github/gws-handoff/payload-${GITHUB_RUN_ID}.b64"
+            K=".github/gws-handoff/key-${GITHUB_RUN_ID}.b64"
+            I=".github/gws-handoff/iv-${GITHUB_RUN_ID}.hex"
+            if git show "origin/main:$P" > /tmp/payload.b64 2>/dev/null \
+              && git show "origin/main:$K" > /tmp/aeskey.b64 2>/dev/null \
+              && git show "origin/main:$I" > /tmp/iv.hex 2>/dev/null; then
+              found=1
+              break
+            fi
+            sleep 5
+          done
+          test "$found" = '1'
 
-          echo "::add-mask::$STORE_PASS"
-          echo "::add-mask::$KEY_PASS"
-          CERT=$(keytool -list -v -keystore "$KEYSTORE_FILE_LOCAL" -storepass "$STORE_PASS" -alias "$ALIAS" 2>/dev/null | sed -n 's/.*SHA256: //p' | head -n1 | tr -d ':' | tr '[:lower:]' '[:upper:]')
-          echo "Recovered certificate: $CERT"
+      - name: Recover and verify original GWS signing key
+        run: |
+          set -euo pipefail
+          base64 -d /tmp/aeskey.b64 > /tmp/aeskey.enc
+          base64 -d /tmp/payload.b64 > /tmp/payload.enc
+          openssl pkeyutl -decrypt \
+            -inkey /tmp/gws_private.pem \
+            -in /tmp/aeskey.enc \
+            -out /tmp/aeskey.bin \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256
+          AES_HEX=$(od -An -tx1 -v /tmp/aeskey.bin | tr -d ' \n')
+          IV_HEX=$(tr -d '[:space:]' < /tmp/iv.hex)
+          openssl enc -d -aes-256-cbc -K "$AES_HEX" -iv "$IV_HEX" -in /tmp/payload.enc -out /tmp/signing-bundle.zip
+          mkdir -p /tmp/gws-signing
+          unzip -q /tmp/signing-bundle.zip -d /tmp/gws-signing
+          test -s /tmp/gws-signing/signing/GreatWhiteTV-release.jks
+          test -s /tmp/gws-signing/signing.env
+          set -a
+          . /tmp/gws-signing/signing.env
+          set +a
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          echo "::add-mask::$KEY_PASSWORD"
+          CERT=$(keytool -list -v -keystore /tmp/gws-signing/signing/GreatWhiteTV-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>/dev/null | sed -n 's/.*SHA256: //p' | head -n1 | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          echo "Recovered GWS certificate: $CERT"
           test "$CERT" = "$EXPECTED_CERT_SHA256"
-
-          echo "KEYSTORE_FILE=$KEYSTORE_FILE_LOCAL" >> "$GITHUB_ENV"
-          echo "KEYSTORE_PASSWORD=$STORE_PASS" >> "$GITHUB_ENV"
-          echo "KEY_ALIAS=$ALIAS" >> "$GITHUB_ENV"
-          echo "KEY_PASSWORD=$KEY_PASS" >> "$GITHUB_ENV"
-          echo 'Correct original GWS signing identity verified.'
+          echo 'KEYSTORE_FILE=/tmp/gws-signing/signing/GreatWhiteTV-release.jks' >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Build GWS Online ARM release APK
         run: |
@@ -144,7 +155,7 @@ jobs:
             "$UNSIGNED_APK"
           test -s dist/GWSOnline.apk
 
-      - name: Verify final APK signer package and launcher
+      - name: Verify final APK identity branding and launcher
         run: |
           set -euo pipefail
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
@@ -167,19 +178,21 @@ jobs:
             echo '::error::Final APK contains a forced TV banner.'
             exit 1
           fi
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
+          "$AAPT" dump badging dist/GWSOnline.apk > /tmp/badging.txt
+          grep -Fq "application-label:'GWS Online'" /tmp/badging.txt
           echo "APK_CERT_SHA256=$ACTUAL" >> "$GITHUB_ENV"
+          echo 'Final APK package, signer, GWS Online label and no-banner launcher behavior verified.'
 
-      - name: Prepare release assets
+      - name: Prepare GWS-only release assets
         run: |
           set -euo pipefail
           cp dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk
-          cp dist/GWSOnline.apk dist/GreatWhiteTV.apk
-          cp dist/GWSOnline.apk dist/OwnTV.apk
           sha256sum dist/GWSOnline.apk | awk '{print $1}' > dist/GWSOnline.sha256
           cat dist/GWSOnline.sha256
           ls -lh dist
 
-      - name: Upload signed APK build artifact
+      - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: GWSOnline-v1.0.12-signed
@@ -192,12 +205,12 @@ jobs:
       - name: Publish GWS Online v1.0.12
         run: |
           set -euo pipefail
-          NOTES=$'GWS Online v1.0.12\n\n- Restores the approved compact browse layout: 180dp category column and 450dp channel column.\n- Restores the original Android TV launcher behavior so the old OwnTV banner is no longer forced.\n- App label is GWS Online.\n- Keeps Online and enables WatchHub as a built-in resolver alongside the existing Online catalog and public-domain source.\n- Preserves the existing package ID and original GWS signing certificate for in-place updates.'
+          NOTES=$'GWS Online v1.0.12\n\n- Restores the approved compact layout: 180dp category column and 450dp channel column.\n- Removes the forced legacy TV banner so Android TV uses the same launcher behavior as the approved build.\n- Visible app name is GWS Online.\n- Keeps Online, with Cinemeta catalog, WatchHub where-to-watch resolution, and Internet Archive public-domain playback enabled by default.\n- Preserves the existing package ID and original GWS signing certificate for in-place updates.'
           if gh release view v1.0.12 >/dev/null 2>&1; then
-            gh release upload v1.0.12 dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk dist/GreatWhiteTV.apk dist/OwnTV.apk dist/GWSOnline.sha256 --clobber
+            gh release upload v1.0.12 dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk dist/GWSOnline.sha256 --clobber
             gh release edit v1.0.12 --title 'GWS Online v1.0.12' --notes "$NOTES" --latest
           else
-            gh release create v1.0.12 dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk dist/GreatWhiteTV.apk dist/OwnTV.apk dist/GWSOnline.sha256 --target main --title 'GWS Online v1.0.12' --notes "$NOTES" --latest
+            gh release create v1.0.12 dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk dist/GWSOnline.sha256 --target main --title 'GWS Online v1.0.12' --notes "$NOTES" --latest
           fi
 
       - name: Verify URLs exactly as Downloader would
@@ -221,13 +234,15 @@ jobs:
           done
           echo 'PUBLIC_URLS_OK=true' >> "$GITHUB_ENV"
 
-      - name: Record verified release status
+      - name: Record result and clean one-time handoff
         if: always()
         run: |
           set -euo pipefail
           git fetch origin main
           git checkout -B main origin/main
-          rm -f .github/GWS_V112_SECRET_TRIGGER
+          rm -f .github/GWS_V112_FINAL_TRIGGER .github/GWS_V112_FINAL_ACTIVE_RUN.txt
+          rm -f ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem" ".github/gws-handoff/payload-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/key-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/iv-${GITHUB_RUN_ID}.hex"
+          rmdir .github/gws-handoff 2>/dev/null || true
           {
             echo 'version=1.0.12'
             echo "run_id=$GITHUB_RUN_ID"
@@ -238,7 +253,7 @@ jobs:
           git config user.name 'GWS Release'
           git config user.email 'actions@users.noreply.github.com'
           git add -A
-          git commit -m 'Record GWS Online v1.0.12 verified release result [skip ci]' || true
+          git commit -m 'Record GWS Online v1.0.12 final release result [skip ci]' || true
           git push origin HEAD:main
 
       - name: Assert release complete
