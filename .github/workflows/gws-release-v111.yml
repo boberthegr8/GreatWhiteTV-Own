@@ -47,7 +47,7 @@ jobs:
           grep -Fq 'val RailWidthFixed = 180.dp' app/src/main/java/tv/own/owntv/ui/theme/Dimens.kt
           grep -Fq 'val ChannelListWidth = 450.dp' app/src/main/java/tv/own/owntv/ui/theme/Dimens.kt
           grep -Fq '<string name="app_name" translatable="false">GWS Online</string>' app/src/main/res/values/donottranslate.xml
-          grep -Fq 'id = "org.stremio.watchhub"' app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt
+          grep -Fq 'id = StremioAddonClient.WATCHHUB' app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt
           grep -Fq 'baseUrl = StremioAddonClient.WATCHHUB' app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt
           if grep -Fq 'android:banner=' app/src/main/AndroidManifest.xml; then
             echo '::error::Forced Android TV banner returned; refusing to publish.'
