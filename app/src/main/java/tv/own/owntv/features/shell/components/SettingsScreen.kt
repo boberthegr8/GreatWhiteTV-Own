@@ -442,7 +442,6 @@ fun SettingsScreen(
             QuickToggleChip(stringResource(R.string.settings_quick_channel_numbers), channelNumbers, OwnTVIcon.LIVE_TV) { settingsVm.setDirectTune(!channelNumbers) }
             QuickToggleChip(stringResource(R.string.settings_quick_hdr), hdr, OwnTVIcon.VIDEO) { settingsVm.setHdrEnabled(!hdr) }
             QuickToggleChip(stringResource(R.string.settings_quick_autoplay), autoPlayNext, OwnTVIcon.SKIP_NEXT) { settingsVm.setAutoPlayNext(!autoPlayNext) }
-            QuickToggleChip(stringResource(R.string.settings_quick_check_update), updateCheckOnStart, OwnTVIcon.DOWNLOADS) { settingsVm.setUpdateCheckOnStart(!updateCheckOnStart) }
         }
         Spacer(Modifier.height(8.dp))
 
