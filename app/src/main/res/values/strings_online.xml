@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_nav_online">Online</string>
+    <string name="online_title">Great White Online</string>
+    <string name="online_subtitle">Browse no-login online catalogs and available direct web sources.</string>
+    <string name="online_movies">Movies</string>
+    <string name="online_series">Series</string>
+    <string name="online_sources">Sources</string>
+    <string name="online_loading">Loading Online…</string>
+    <string name="online_error">Online could not load right now. Try again.</string>
+    <string name="online_empty">No titles found.</string>
+    <string name="online_source_cinemeta">Online catalog</string>
+    <string name="online_item_no_description">No description is available.</string>
+    <string name="online_choose_episode">Choose an episode</string>
+    <string name="online_loading_episodes">Loading episodes…</string>
+    <string name="online_no_episodes">No episodes found.</string>
+    <string name="online_available_streams">Available sources</string>
+    <string name="online_no_streams">No direct web source is available for this title from the enabled providers.</string>
+    <string name="online_loading_streams">Checking enabled providers…</string>
+    <string name="online_external_open_failed">Could not open that source on this device.</string>
+    <string name="online_sources_title">Online Sources</string>
+    <string name="online_sources_subtitle">Great White includes default no-login sources. Advanced users can add compatible provider manifests.</string>
+    <string name="online_source_url_hint">Provider manifest URL</string>
+    <string name="online_source_add">Add source</string>
+    <string name="online_source_checking">Checking source…</string>
+    <string name="online_source_added">Source added.</string>
+    <string name="online_source_invalid">That source is not a compatible provider.</string>
+    <string name="online_source_builtin">Built in</string>
+    <string name="online_source_remove">Remove</string>
+    <string name="online_search_hint">Search Online…</string>
+</resources>

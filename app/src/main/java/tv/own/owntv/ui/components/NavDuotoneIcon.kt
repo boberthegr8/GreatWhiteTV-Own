@@ -74,7 +74,7 @@ fun NavDuotoneIcon(
             }
 
             // ---- Movies — film strip sprocket + play ------------------------------
-            MainSection.MOVIES -> {
+            MainSection.MOVIES, MainSection.ONLINE -> {
                 drawPath(polyC(21f,33f, 76f,21f, 79f,36f, 24f,48f), soft)
                 drawPath(poly(33f,30f, 44f,43f), soft, style = thin)
                 drawPath(poly(51f,26f, 62f,39f), soft, style = thin)
