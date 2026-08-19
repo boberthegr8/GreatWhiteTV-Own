@@ -67,10 +67,19 @@ private data class ResolvedOnlineStream(
     val stream: OnlineStream,
 )
 
+private val PUBLIC_DOMAIN_PROVIDER = OnlineAddon(
+    id = "greatwhite.publicdomain",
+    name = "Internet Archive · Public Domain",
+    baseUrl = "https://archive.org",
+    resources = emptySet(),
+    types = setOf("movie"),
+    builtIn = true,
+)
+
 /**
- * Great White Online's independent browse surface. Cinemeta supplies the default catalog and metadata;
- * stream-capable add-ons are queried separately. Only direct HTTP(S) or external provider links are
- * accepted by [StremioAddonClient], so unsupported transport types never reach OwnTV's player.
+ * Great White Online's independent browse surface. Cinemeta supplies the default catalog and metadata.
+ * No-account public-domain movie playback is resolved through Internet Archive; optional user-added
+ * Stremio-compatible HTTP(S) providers are queried separately. Online remains isolated from IPTV data.
  */
 @Composable
 fun OnlineScreen(
@@ -82,6 +91,7 @@ fun OnlineScreen(
     val externalOpenFailedText = stringResource(R.string.online_external_open_failed)
     val colors = OwnTVTheme.colors
     val client = remember { StremioAddonClient() }
+    val publicDomainClient = remember { InternetArchivePublicDomainClient() }
     val addonStore = remember { OnlineAddonStore(context.applicationContext) }
     val scope = rememberCoroutineScope()
 
@@ -142,14 +152,25 @@ fun OnlineScreen(
         }
         value = OnlineStreamsState.Loading
         value = withContext(Dispatchers.IO) {
-            val resolved = addonStore.streamProviders()
+            val publicDomain = if (item.type == "movie") {
+                runCatching { publicDomainClient.streamsFor(item) }
+                    .getOrDefault(emptyList())
+                    .map { ResolvedOnlineStream(PUBLIC_DOMAIN_PROVIDER, it) }
+            } else {
+                emptyList()
+            }
+            val configured = addonStore.streamProviders()
                 .filter { item.type in it.types || it.types.isEmpty() }
                 .flatMap { provider ->
                     runCatching { client.streams(provider.baseUrl, item.type, id) }
                         .getOrDefault(emptyList())
                         .map { ResolvedOnlineStream(provider, it) }
                 }
-            OnlineStreamsState.Ready(resolved)
+            OnlineStreamsState.Ready(
+                (publicDomain + configured).distinctBy {
+                    "${it.stream.url}:${it.stream.externalUrl}:${it.stream.title}"
+                },
+            )
         }
     }
 
