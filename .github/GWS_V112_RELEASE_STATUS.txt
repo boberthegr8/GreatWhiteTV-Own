@@ -1,4 +1,4 @@
 version=1.0.12
-run_id=32229105783
-apk_cert_sha256=unavailable
-public_urls_ok=false
+run_id=32229803561
+apk_cert_sha256=EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C
+public_urls_ok=true
