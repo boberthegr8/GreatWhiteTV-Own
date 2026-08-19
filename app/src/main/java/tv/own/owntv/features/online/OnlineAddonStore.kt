@@ -26,10 +26,9 @@ class OnlineAddonStore(context: Context) {
 
     fun all(): List<OnlineAddon> = BUILT_INS + custom()
 
-    /** Built-in and user-added stream providers. WatchHub was previously declared in the client but
-     * never actually enabled here, leaving a fresh install with effectively no general Online resolver. */
+    /** Include the built-in where-to-watch resolver plus any user-added stream providers. */
     fun streamProviders(): List<OnlineAddon> = (BUILT_INS + custom())
-        .filter { it.supportsStream }
+        .filter { it.supportsStream || it.baseUrl == StremioAddonClient.WATCHHUB }
         .distinctBy { it.id }
 
     fun custom(): List<OnlineAddon> {
@@ -104,33 +103,35 @@ class OnlineAddonStore(context: Context) {
         private const val PREFS = "greatwhite_online_addons"
         private const val KEY_CUSTOM = "custom"
 
-        /** No-account defaults. Cinemeta supplies catalog/metadata, WatchHub resolves legal
-         * where-to-watch links, and Internet Archive public-domain playback is added separately. */
-        val BUILT_INS = listOf(
-            OnlineAddon(
-                id = "com.linvo.cinemeta",
-                name = "Cinemeta",
-                baseUrl = StremioAddonClient.CINEMETA,
-                resources = setOf("catalog", "meta"),
-                types = setOf("movie", "series"),
-                builtIn = true,
-            ),
-            OnlineAddon(
-                id = "org.stremio.watchhub",
-                name = "WatchHub",
-                baseUrl = StremioAddonClient.WATCHHUB,
-                resources = setOf("stream"),
-                types = setOf("movie", "series"),
-                builtIn = true,
-            ),
-            OnlineAddon(
-                id = "greatwhite.publicdomain",
-                name = "Internet Archive · Public Domain",
-                baseUrl = "https://archive.org",
-                resources = emptySet(),
-                types = setOf("movie"),
-                builtIn = true,
-            ),
-        )
+        /** No-account defaults: catalog/metadata, legal where-to-watch resolution, and public domain. */
+        val BUILT_INS = run {
+            val movieAndSeriesTypes = setOf("movie", "series")
+            listOf(
+                OnlineAddon(
+                    id = "com.linvo.cinemeta",
+                    name = "Cinemeta",
+                    baseUrl = StremioAddonClient.CINEMETA,
+                    resources = setOf("catalog", "meta"),
+                    types = movieAndSeriesTypes,
+                    builtIn = true,
+                ),
+                OnlineAddon(
+                    id = StremioAddonClient.WATCHHUB,
+                    name = StremioAddonClient.WATCHHUB,
+                    baseUrl = StremioAddonClient.WATCHHUB,
+                    resources = emptySet(),
+                    types = movieAndSeriesTypes,
+                    builtIn = true,
+                ),
+                OnlineAddon(
+                    id = "greatwhite.publicdomain",
+                    name = "Internet Archive · Public Domain",
+                    baseUrl = "https://archive.org",
+                    resources = emptySet(),
+                    types = setOf("movie"),
+                    builtIn = true,
+                ),
+            )
+        }
     }
 }
