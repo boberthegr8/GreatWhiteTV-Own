@@ -1,21 +1,21 @@
-name: GWS Online v1.0.12 final verified release
+name: GWS Online v1.0.13 final verified release
 
 on:
   push:
     branches: [ main ]
     paths:
-      - '.github/GWS_V112_FINAL_TRIGGER'
+      - '.github/GWS_V113_FINAL_TRIGGER'
 
 permissions:
   contents: write
 
 concurrency:
-  group: gws-release-v112-final
+  group: gws-release-v113-final
   cancel-in-progress: false
 
 env:
-  VERSION_NAME: '1.0.12'
-  VERSION_CODE: '10012'
+  VERSION_NAME: '1.0.13'
+  VERSION_CODE: '10013'
   EXPECTED_CERT_SHA256: 'EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C'
   GH_TOKEN: ${{ github.token }}
 
@@ -49,17 +49,18 @@ jobs:
           grep -Fq '<string name="app_name" translatable="false">GWS Online</string>' app/src/main/res/values/donottranslate.xml
           grep -Fq 'id = StremioAddonClient.WATCHHUB' app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt
           grep -Fq 'baseUrl = StremioAddonClient.WATCHHUB' app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt
+          test ! -e app/src/main/res/drawable-xhdpi/tv_banner.png
           if grep -Fq 'android:banner=' app/src/main/AndroidManifest.xml; then
             echo '::error::Forced Android TV banner returned; refusing to publish.'
             exit 1
           fi
-          echo 'Approved 180/450 layout, GWS Online label, launcher behavior and Online defaults verified.'
+          echo 'Approved 180/450 layout, GWS Online label, no legacy banner asset, launcher behavior and Online defaults verified.'
 
       - name: Verify Online endpoints
         run: |
           set -euo pipefail
-          curl -fsSL --connect-timeout 15 --max-time 45 -A 'GWSOnline/1.0.12' https://v3-cinemeta.strem.io/manifest.json -o /tmp/cinemeta.json
-          curl -fsSL --connect-timeout 15 --max-time 45 -A 'GWSOnline/1.0.12' https://watchhub.strem.io/manifest.json -o /tmp/watchhub.json
+          curl -fsSL --connect-timeout 15 --max-time 45 -A 'GWSOnline/1.0.13' https://v3-cinemeta.strem.io/manifest.json -o /tmp/cinemeta.json
+          curl -fsSL --connect-timeout 15 --max-time 45 -A 'GWSOnline/1.0.13' https://watchhub.strem.io/manifest.json -o /tmp/watchhub.json
           grep -Fq 'com.linvo.cinemeta' /tmp/cinemeta.json
           grep -Fq 'org.stremio.watchhub' /tmp/watchhub.json
           echo 'Online catalog and WatchHub endpoints reachable.'
@@ -73,11 +74,11 @@ jobs:
           git checkout -B main origin/main
           mkdir -p .github/gws-handoff
           cp /tmp/gws_public.pem ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem"
-          printf '%s\n' "$GITHUB_RUN_ID" > .github/GWS_V112_FINAL_ACTIVE_RUN.txt
+          printf '%s\n' "$GITHUB_RUN_ID" > .github/GWS_V113_FINAL_ACTIVE_RUN.txt
           git config user.name 'GWS Release'
           git config user.email 'actions@users.noreply.github.com'
-          git add .github/gws-handoff .github/GWS_V112_FINAL_ACTIVE_RUN.txt
-          git commit -m "Publish GWS v1.0.12 one-time signing key for run ${GITHUB_RUN_ID} [skip ci]"
+          git add .github/gws-handoff .github/GWS_V113_FINAL_ACTIVE_RUN.txt
+          git commit -m "Publish GWS v1.0.13 one-time signing key for run ${GITHUB_RUN_ID} [skip ci]"
           git push origin HEAD:main
 
       - name: Wait for encrypted signing bundle
@@ -182,12 +183,12 @@ jobs:
           "$AAPT" dump badging dist/GWSOnline.apk > /tmp/badging.txt
           grep -Fq "application-label:'GWS Online'" /tmp/badging.txt
           echo "APK_CERT_SHA256=$ACTUAL" >> "$GITHUB_ENV"
-          echo 'Final APK package, signer, GWS Online label and no-banner launcher behavior verified.'
+          echo 'Final APK package, signer, GWS Online label and launcher behavior verified.'
 
       - name: Prepare GWS-only release assets
         run: |
           set -euo pipefail
-          cp dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk
+          cp dist/GWSOnline.apk dist/GWSOnline-v1.0.13.apk
           sha256sum dist/GWSOnline.apk | awk '{print $1}' > dist/GWSOnline.sha256
           cat dist/GWSOnline.sha256
           ls -lh dist
@@ -195,29 +196,29 @@ jobs:
       - name: Upload signed APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: GWSOnline-v1.0.12-signed
+          name: GWSOnline-v1.0.13-signed
           path: |
             dist/GWSOnline.apk
-            dist/GWSOnline-v1.0.12.apk
+            dist/GWSOnline-v1.0.13.apk
             dist/GWSOnline.sha256
           if-no-files-found: error
 
-      - name: Publish GWS Online v1.0.12
+      - name: Publish GWS Online v1.0.13
         run: |
           set -euo pipefail
-          NOTES=$'GWS Online v1.0.12\n\n- Restores the approved compact layout: 180dp category column and 450dp channel column.\n- Removes the forced legacy TV banner so Android TV uses the same launcher behavior as the approved build.\n- Visible app name is GWS Online.\n- Keeps Online, with Cinemeta catalog, WatchHub where-to-watch resolution, and Internet Archive public-domain playback enabled by default.\n- Preserves the existing package ID and original GWS signing certificate for in-place updates.'
-          if gh release view v1.0.12 >/dev/null 2>&1; then
-            gh release upload v1.0.12 dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk dist/GWSOnline.sha256 --clobber
-            gh release edit v1.0.12 --title 'GWS Online v1.0.12' --notes "$NOTES" --latest
+          NOTES=$'GWS Online v1.0.13\n\n- Restores the approved compact layout: 180dp category column and 450dp channel column.\n- Completely removes the legacy OwnTV 320x180 TV banner asset and forced banner declaration.\n- Visible app name is GWS Online.\n- Keeps Online, with Cinemeta catalog, WatchHub where-to-watch resolution, and Internet Archive public-domain playback enabled by default.\n- Preserves the existing package ID and original GWS signing certificate for in-place updates.'
+          if gh release view v1.0.13 >/dev/null 2>&1; then
+            gh release upload v1.0.13 dist/GWSOnline.apk dist/GWSOnline-v1.0.13.apk dist/GWSOnline.sha256 --clobber
+            gh release edit v1.0.13 --title 'GWS Online v1.0.13' --notes "$NOTES" --latest
           else
-            gh release create v1.0.12 dist/GWSOnline.apk dist/GWSOnline-v1.0.12.apk dist/GWSOnline.sha256 --target main --title 'GWS Online v1.0.12' --notes "$NOTES" --latest
+            gh release create v1.0.13 dist/GWSOnline.apk dist/GWSOnline-v1.0.13.apk dist/GWSOnline.sha256 --target main --title 'GWS Online v1.0.13' --notes "$NOTES" --latest
           fi
 
       - name: Verify URLs exactly as Downloader would
         run: |
           set -euo pipefail
           EXPECTED=$(cat dist/GWSOnline.sha256)
-          VERSIONED='https://github.com/boberthegr8/GreatWhiteTV-Own/releases/download/v1.0.12/GWSOnline.apk'
+          VERSIONED='https://github.com/boberthegr8/GreatWhiteTV-Own/releases/download/v1.0.13/GWSOnline.apk'
           LATEST='https://github.com/boberthegr8/GreatWhiteTV-Own/releases/latest/download/GWSOnline.apk'
           for URL in "$VERSIONED" "$LATEST"; do
             ok=0
@@ -240,20 +241,20 @@ jobs:
           set -euo pipefail
           git fetch origin main
           git checkout -B main origin/main
-          rm -f .github/GWS_V112_FINAL_TRIGGER .github/GWS_V112_FINAL_ACTIVE_RUN.txt
+          rm -f .github/GWS_V113_FINAL_TRIGGER .github/GWS_V113_FINAL_ACTIVE_RUN.txt
           rm -f ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem" ".github/gws-handoff/payload-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/key-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/iv-${GITHUB_RUN_ID}.hex"
           rmdir .github/gws-handoff 2>/dev/null || true
           {
-            echo 'version=1.0.12'
+            echo 'version=1.0.13'
             echo "run_id=$GITHUB_RUN_ID"
             echo "apk_cert_sha256=${APK_CERT_SHA256:-unavailable}"
             echo "public_urls_ok=${PUBLIC_URLS_OK:-false}"
-          } > .github/GWS_V112_RELEASE_STATUS.txt
-          if [ "${PUBLIC_URLS_OK:-false}" = 'true' ]; then printf '1.0.12\n' > GWS_VERSION; fi
+          } > .github/GWS_V113_RELEASE_STATUS.txt
+          if [ "${PUBLIC_URLS_OK:-false}" = 'true' ]; then printf '1.0.13\n' > GWS_VERSION; fi
           git config user.name 'GWS Release'
           git config user.email 'actions@users.noreply.github.com'
           git add -A
-          git commit -m 'Record GWS Online v1.0.12 final release result [skip ci]' || true
+          git commit -m 'Record GWS Online v1.0.13 final release result [skip ci]' || true
           git push origin HEAD:main
 
       - name: Assert release complete
