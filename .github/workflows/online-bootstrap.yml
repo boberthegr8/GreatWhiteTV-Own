@@ -112,6 +112,11 @@ jobs:
           icon = 'app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt'
           replace_once(icon, '            MainSection.MOVIES -> {', '            MainSection.MOVIES, MainSection.ONLINE -> {')
 
+          sidebar = 'app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt'
+          replace_once(sidebar,
+              '        MainSection.MOVIES -> OwnTVIcon.MOVIES\n        MainSection.SERIES -> OwnTVIcon.SERIES\n        MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS',
+              '        MainSection.MOVIES -> OwnTVIcon.MOVIES\n        MainSection.SERIES -> OwnTVIcon.SERIES\n        MainSection.ONLINE -> OwnTVIcon.MOVIES\n        MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS')
+
           Path('app/src/main/res/values/strings_online.xml').write_text('''<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <string name="common_nav_online">Online</string>\n    <string name="online_title">Great White Online</string>\n    <string name="online_subtitle">Browse no-login online catalogs and available direct web sources.</string>\n    <string name="online_movies">Movies</string>\n    <string name="online_series">Series</string>\n    <string name="online_sources">Sources</string>\n    <string name="online_loading">Loading Online…</string>\n    <string name="online_error">Online could not load right now. Try again.</string>\n    <string name="online_empty">No titles found.</string>\n    <string name="online_source_cinemeta">Online catalog</string>\n    <string name="online_item_no_description">No description is available.</string>\n    <string name="online_choose_episode">Choose an episode</string>\n    <string name="online_loading_episodes">Loading episodes…</string>\n    <string name="online_no_episodes">No episodes found.</string>\n    <string name="online_available_streams">Available sources</string>\n    <string name="online_no_streams">No direct web source is available for this title from the enabled providers.</string>\n    <string name="online_loading_streams">Checking enabled providers…</string>\n    <string name="online_external_open_failed">Could not open that source on this device.</string>\n    <string name="online_sources_title">Online Sources</string>\n    <string name="online_sources_subtitle">Great White includes default no-login sources. Advanced users can add compatible provider manifests.</string>\n    <string name="online_source_url_hint">Provider manifest URL</string>\n    <string name="online_source_add">Add source</string>\n    <string name="online_source_checking">Checking source…</string>\n    <string name="online_source_added">Source added.</string>\n    <string name="online_source_invalid">That source is not a compatible provider.</string>\n    <string name="online_source_builtin">Built in</string>\n    <string name="online_source_remove">Remove</string>\n    <string name="online_search_hint">Search Online…</string>\n</resources>\n''', encoding='utf-8')
           PY
 
@@ -171,7 +176,7 @@ jobs:
           grep -F 'GreatWhiteTV.apk' app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt
           grep -F 'dist/GreatWhiteTV.apk' .github/workflows/android.yml
           grep -F 'dist/OwnTV.apk' .github/workflows/android.yml
-          allowed='^(app/src/main/java/tv/own/owntv/features/online/(OnlineAddonStore|OnlineScreen|StremioAddonClient)\.kt|app/src/main/java/tv/own/owntv/features/shell/ShellViewModel\.kt|app/src/main/java/tv/own/owntv/features/shell/OwnTVShell\.kt|app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon\.kt|app/src/main/res/values/strings_online\.xml)$'
+          allowed='^(app/src/main/java/tv/own/owntv/features/online/(OnlineAddonStore|OnlineScreen|StremioAddonClient)\.kt|app/src/main/java/tv/own/owntv/features/shell/ShellViewModel\.kt|app/src/main/java/tv/own/owntv/features/shell/OwnTVShell\.kt|app/src/main/java/tv/own/owntv/features/shell/components/Sidebar\.kt|app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon\.kt|app/src/main/res/values/strings_online\.xml)$'
           bad=$(git diff --name-only HEAD -- app | grep -Ev "$allowed" || true)
           if [ -n "$bad" ]; then echo "Unexpected app files changed:"; echo "$bad"; exit 1; fi
           echo 'Only Online + the minimal navigation/player bridge changed under app/.'
@@ -265,6 +270,7 @@ jobs:
             app/src/main/java/tv/own/owntv/features/online \
             app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt \
             app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt \
+            app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt \
             app/src/main/java/tv/own/owntv/ui/components/NavDuotoneIcon.kt \
             app/src/main/res/values/strings_online.xml \
             tools/i18n/safe_literals.txt \
