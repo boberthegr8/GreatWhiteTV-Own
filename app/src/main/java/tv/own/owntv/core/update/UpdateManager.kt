@@ -75,12 +75,10 @@ class UpdateManager(
     /**
      * Legacy startup hook retained so an older shell/settings preference cannot trigger an update check.
      * Great White updates are manual-only: callers that represent an explicit user action must use
-     * [checkManual]. Keeping this method as a no-op also disables auto-checks for users whose old
-     * `check on start` preference is still stored as true after upgrading.
+     * [checkManual]. This is intentionally a true no-op so it cannot interrupt a manual check already
+     * in progress during the first few seconds after app launch.
      */
-    fun check() {
-        reset()
-    }
+    fun check() = Unit
 
     /** Queries Great White TV's latest release after an explicit user action. */
     fun checkManual() {
