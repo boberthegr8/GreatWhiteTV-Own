@@ -1,0 +1,46 @@
+name: Remove auto-update quick toggle
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/REMOVE_AUTO_UPDATE_QUICK_TOGGLE'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Remove legacy quick toggle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/tv/own/owntv/features/shell/components/SettingsScreen.kt')
+          text = p.read_text(encoding='utf-8')
+          old = '            QuickToggleChip(stringResource(R.string.settings_quick_check_update), updateCheckOnStart, OwnTVIcon.DOWNLOADS) { settingsVm.setUpdateCheckOnStart(!updateCheckOnStart) }\n'
+          if old not in text:
+              raise SystemExit('Legacy auto-update quick toggle not found; refusing blind edit')
+          text = text.replace(old, '', 1)
+          if 'updateCheckOnStart' in text:
+              raise SystemExit('Another updateCheckOnStart reference remains in SettingsScreen.kt')
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Remove one-shot workflow and trigger
+        run: |
+          rm -f .github/REMOVE_AUTO_UPDATE_QUICK_TOGGLE
+          rm -f .github/workflows/remove-auto-update-quick-toggle.yml
+      - name: Commit fix
+        run: |
+          set -euo pipefail
+          git config user.name "Great White CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Remove automatic update quick toggle [skip ci]"
+          git push origin HEAD:main
