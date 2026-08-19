@@ -26,7 +26,7 @@ class OnlineAddonStore(context: Context) {
 
     fun all(): List<OnlineAddon> = BUILT_INS + custom()
 
-    fun streamProviders(): List<OnlineAddon> = all().filter { it.supportsStream }
+    fun streamProviders(): List<OnlineAddon> = custom().filter { it.supportsStream }
 
     fun custom(): List<OnlineAddon> {
         val raw = prefs.getString(KEY_CUSTOM, null) ?: return emptyList()
@@ -100,6 +100,8 @@ class OnlineAddonStore(context: Context) {
         private const val PREFS = "greatwhite_online_addons"
         private const val KEY_CUSTOM = "custom"
 
+        /** No-account defaults. Public-domain playback is provided separately by
+         * [InternetArchivePublicDomainClient]; Cinemeta supplies only catalog/metadata. */
         val BUILT_INS = listOf(
             OnlineAddon(
                 id = "com.linvo.cinemeta",
@@ -110,11 +112,11 @@ class OnlineAddonStore(context: Context) {
                 builtIn = true,
             ),
             OnlineAddon(
-                id = "org.stremio.watchhub",
-                name = "WatchHub",
-                baseUrl = StremioAddonClient.WATCHHUB,
-                resources = setOf("stream"),
-                types = setOf("movie", "series"),
+                id = "greatwhite.publicdomain",
+                name = "Internet Archive · Public Domain",
+                baseUrl = "https://archive.org",
+                resources = emptySet(),
+                types = setOf("movie"),
                 builtIn = true,
             ),
         )
