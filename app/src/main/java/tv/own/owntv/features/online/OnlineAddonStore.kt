@@ -19,14 +19,18 @@ data class OnlineAddon(
 
 /**
  * App-private Online add-on list. The IPTV source database is intentionally untouched: experimental
- * Online providers cannot corrupt, migrate, or otherwise interfere with a user's HUSH/CCTV playlists.
+ * Online providers cannot corrupt, migrate, or otherwise interfere with a user's IPTV playlists.
  */
 class OnlineAddonStore(context: Context) {
     private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     fun all(): List<OnlineAddon> = BUILT_INS + custom()
 
-    fun streamProviders(): List<OnlineAddon> = custom().filter { it.supportsStream }
+    /** Built-in and user-added stream providers. WatchHub was previously declared in the client but
+     * never actually enabled here, leaving a fresh install with effectively no general Online resolver. */
+    fun streamProviders(): List<OnlineAddon> = (BUILT_INS + custom())
+        .filter { it.supportsStream }
+        .distinctBy { it.id }
 
     fun custom(): List<OnlineAddon> {
         val raw = prefs.getString(KEY_CUSTOM, null) ?: return emptyList()
@@ -100,14 +104,22 @@ class OnlineAddonStore(context: Context) {
         private const val PREFS = "greatwhite_online_addons"
         private const val KEY_CUSTOM = "custom"
 
-        /** No-account defaults. Public-domain playback is provided separately by
-         * [InternetArchivePublicDomainClient]; Cinemeta supplies only catalog/metadata. */
+        /** No-account defaults. Cinemeta supplies catalog/metadata, WatchHub resolves legal
+         * where-to-watch links, and Internet Archive public-domain playback is added separately. */
         val BUILT_INS = listOf(
             OnlineAddon(
                 id = "com.linvo.cinemeta",
                 name = "Cinemeta",
                 baseUrl = StremioAddonClient.CINEMETA,
                 resources = setOf("catalog", "meta"),
+                types = setOf("movie", "series"),
+                builtIn = true,
+            ),
+            OnlineAddon(
+                id = "org.stremio.watchhub",
+                name = "WatchHub",
+                baseUrl = StremioAddonClient.WATCHHUB,
+                resources = setOf("stream"),
                 types = setOf("movie", "series"),
                 builtIn = true,
             ),

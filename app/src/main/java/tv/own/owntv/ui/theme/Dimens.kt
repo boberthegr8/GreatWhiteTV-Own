@@ -18,11 +18,10 @@ object Dimens {
     // Layer 2 — category rail (expands to show full names when it holds focus)
     val RailWidth = 92.dp
     val RailWidthExpanded = 325.dp // expanded (focused overlay) width — fits long category names
-    val RailWidthFixed = 272.dp    // Phase 2: fixed full-label category column (names wrap to 2 lines)
+    // GWS approved compact layout. Keep these values fixed unless Rob explicitly changes them.
+    val RailWidthFixed = 180.dp
     val RailPillSize = 56.dp
-    val ChannelListWidth = 460.dp  // Phase 2: fixed channel-list column (Live); preview/detail fills the rest.
-    // Widened from 400dp so each row can also show the current programme (EPG) on a second line — the
-    // preview pane (Modifier.weight(1f)) narrows in step, so no other layout value needs to change.
+    val ChannelListWidth = 450.dp
 
     // MD3 settings tonal icon tile
     val IconTileSize = 42.dp
