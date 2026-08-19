@@ -21,8 +21,8 @@ import java.io.IOException
 /**
  * In-app updates straight from Great White TV's GitHub Releases: checks this repo's latest release,
  * compares its tag with the installed version, downloads the release APK, and hands it to the
- * system installer. The release workflow publishes a stable `OwnTV.apk` for real Android TV / Fire
- * TV devices plus a separate x86_64 APK for emulators.
+ * system installer. The release workflow publishes a stable `GreatWhiteTV.apk` for real Android TV /
+ * Fire TV devices plus a separate x86_64 APK for emulators.
  */
 class UpdateManager(
     private val context: Context,
@@ -92,9 +92,9 @@ class UpdateManager(
                         ?: throw InvalidReleaseResponseException()
                     val notes = o.optString("body").take(16_000)
                     val assets = o.optJSONArray("assets") ?: throw InvalidReleaseResponseException()
-                    // Releases carry a stable ARM APK named OwnTV.apk plus a versioned x86_64 APK.
-                    // Never silently install an APK for the wrong ABI. On ARM, prefer the permanent
-                    // stable asset so the in-app updater and Downloader URL use the exact same file.
+                    // Great White releases carry a stable ARM APK named GreatWhiteTV.apk plus a versioned
+                    // x86_64 APK. OwnTV.apk remains accepted only as a compatibility bridge for installs
+                    // created before the release asset was renamed.
                     val wantX86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
                     val candidates = (0 until assets.length())
                         .asSequence()
@@ -108,7 +108,8 @@ class UpdateManager(
                     val apkUrl = if (wantX86) {
                         candidates.firstOrNull { (name, _) -> name.contains("x86_64", ignoreCase = true) }?.second
                     } else {
-                        candidates.firstOrNull { (name, _) -> name.equals("OwnTV.apk", ignoreCase = true) }?.second
+                        candidates.firstOrNull { (name, _) -> name.equals("GreatWhiteTV.apk", ignoreCase = true) }?.second
+                            ?: candidates.firstOrNull { (name, _) -> name.equals("OwnTV.apk", ignoreCase = true) }?.second
                             ?: candidates.firstOrNull { (name, _) -> !name.contains("x86_64", ignoreCase = true) }?.second
                     } ?: throw NoCompatibleApkException()
                     val info = UpdateInfo(version, notes, apkUrl)
