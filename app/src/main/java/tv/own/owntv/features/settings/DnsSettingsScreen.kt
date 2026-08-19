@@ -205,6 +205,7 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
     val firstPresetFocus = remember { FocusRequester() }
     val serverFieldFocus = remember { FocusRequester() }
     val saveFocus = remember { FocusRequester() }
+    var advancedToggleInitialized by remember { mutableStateOf(false) }
 
     LaunchedEffect(xtreamSources.isNotEmpty()) {
         kotlinx.coroutines.delay(60)
@@ -212,9 +213,13 @@ fun DnsSettingsScreen(onBack: () -> Unit, modifier: Modifier = Modifier) {
         else runCatching { toggleFocus.requestFocus() }
     }
 
+    // Do not let the legacy resolver toggle steal initial focus from the new Provider DNS focal point.
+    // After initial composition, an actual user toggle keeps the old focus behavior intact.
     LaunchedEffect(toggleOn) {
-        if (!toggleFocus.captureFocus()) return@LaunchedEffect
-        toggleFocus.freeFocus()
+        if (!advancedToggleInitialized) {
+            advancedToggleInitialized = true
+            return@LaunchedEffect
+        }
         kotlinx.coroutines.delay(60)
         if (toggleOn) runCatching { firstPresetFocus.requestFocus() }
         else runCatching { toggleFocus.requestFocus() }
