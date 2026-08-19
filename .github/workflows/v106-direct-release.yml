@@ -1,0 +1,99 @@
+name: Publish corrected Great White v1.0.6
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/PUBLISH_CORRECTED_V106'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_CERT_SHA256: 'EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C'
+      VERSION_NAME: '1.0.6'
+      VERSION_CODE: '10006'
+    steps:
+      - name: Checkout corrected main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Restore permanent Great White signing key
+        env:
+          GWS_KEYSTORE_BASE64_SECRET: ${{ secrets.GWS_KEYSTORE_BASE64 }}
+          GWS_KEYSTORE_PASSWORD_SECRET: ${{ secrets.GWS_KEYSTORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$GWS_KEYSTORE_BASE64_SECRET" ] || [ -z "$GWS_KEYSTORE_PASSWORD_SECRET" ]; then
+            echo "::error::Permanent Great White signing secrets are missing."
+            exit 1
+          fi
+          printf '%s' "$GWS_KEYSTORE_BASE64_SECRET" | base64 --decode > "$RUNNER_TEMP/greatwhite-release.jks"
+          echo "::add-mask::$GWS_KEYSTORE_PASSWORD_SECRET"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/greatwhite-release.jks" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=greatwhite" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$GWS_KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
+      - name: Derive release edge key
+        env:
+          OWNTV_EDGE_MASTER: ${{ secrets.OWNTV_EDGE_MASTER }}
+          OWNTV_EDGE_KEY_SECRET: ${{ secrets.OWNTV_EDGE_KEY }}
+        run: |
+          if [ -n "$OWNTV_EDGE_MASTER" ]; then
+            KEY=$(printf '%s' "$VERSION_NAME" | openssl dgst -sha256 -hmac "$OWNTV_EDGE_MASTER" -hex | awk '{print $NF}')
+            echo "::add-mask::$KEY"
+            echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
+          elif [ -n "$OWNTV_EDGE_KEY_SECRET" ]; then
+            echo "::add-mask::$OWNTV_EDGE_KEY_SECRET"
+            echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"
+          fi
+      - name: Compile release and verify permanent signer
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --stacktrace
+          ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
+          X86_SRC=$(ls app/build/outputs/apk/x86_64/release/*.apk | head -n1)
+          test -f "$ARM_SRC"
+          test -f "$X86_SRC"
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          ACTUAL=$("$APKSIGNER" verify --print-certs "$ARM_SRC" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          echo "Signer SHA-256: $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED_CERT_SHA256"
+          mkdir -p dist
+          cp "$ARM_SRC" dist/GreatWhiteTV-v1.0.6.apk
+          cp "$ARM_SRC" dist/GreatWhiteTV.apk
+          cp "$ARM_SRC" dist/OwnTV.apk
+          cp "$X86_SRC" dist/GreatWhiteTV-x86_64-v1.0.6.apk
+          sha256sum dist/*.apk > dist/SHA256SUMS.txt
+      - name: Publish v1.0.6 GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.6
+          target_commitish: main
+          name: Great White TV v1.0.6
+          body: |
+            Great White TV v1.0.6
+
+            - Updates are now manual only; no automatic startup update prompt/check.
+            - Settings keeps an explicit Check for updates action.
+            - Added Change DNS for Xtream provider/server changes.
+            - Change DNS preserves username/password and immediately refreshes playlist + EPG.
+          files: |
+            dist/GreatWhiteTV-v1.0.6.apk
+            dist/GreatWhiteTV.apk
+            dist/OwnTV.apk
+            dist/GreatWhiteTV-x86_64-v1.0.6.apk
+            dist/SHA256SUMS.txt
+          fail_on_unmatched_files: true
