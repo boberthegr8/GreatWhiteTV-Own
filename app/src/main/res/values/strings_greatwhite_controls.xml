@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_provider_dns_title">Change Provider DNS</string>
+    <string name="settings_provider_dns_warning">Only change this when your IPTV provider gives you a new DNS/server address. Your username and password stay exactly the same.</string>
+    <string name="settings_provider_dns_no_xtream">No Xtream playlist is configured. Provider DNS changes are available for Xtream accounts.</string>
+    <string name="settings_provider_dns_playlist">Playlist: %1$s</string>
+    <string name="settings_provider_dns_current">Current server: %1$s</string>
+    <string name="settings_provider_dns_server">New DNS / server</string>
+    <string name="settings_provider_dns_hint">http://example.com:8080</string>
+    <string name="settings_provider_dns_apply">Change DNS &amp; Refresh</string>
+    <string name="settings_provider_dns_invalid">Enter a valid http:// or https:// server address.</string>
+    <string name="settings_provider_dns_applying">Saving DNS and refreshing playlist + EPG…</string>
+    <string name="settings_provider_dns_success">DNS changed. Playlist and EPG refresh started.</string>
+    <string name="settings_provider_dns_failed">Could not complete the DNS change.</string>
+    <string name="settings_provider_dns_advanced">Advanced network DNS</string>
+    <string name="settings_provider_dns_advanced_note">These controls change how Great White resolves internet addresses. They do not change your IPTV provider server.</string>
+</resources>
