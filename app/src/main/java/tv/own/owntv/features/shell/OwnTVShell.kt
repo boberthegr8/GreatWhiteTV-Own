@@ -52,6 +52,7 @@ import tv.own.owntv.features.live.LiveScreen
 import tv.own.owntv.features.live.LiveViewModel
 import tv.own.owntv.features.movies.MoviesScreen
 import tv.own.owntv.features.movies.MovieViewModel
+import tv.own.owntv.features.online.OnlineScreen
 import tv.own.owntv.features.search.SearchScreen
 import tv.own.owntv.features.search.SearchViewModel
 import tv.own.owntv.features.home.TrendingHomeItem
@@ -722,6 +723,22 @@ fun OwnTVShell(
                             modifier = Modifier.fillMaxSize(),
                         )
 
+                        selectedSection == MainSection.ONLINE -> OnlineScreen(
+                            onPlayDirect = { item, episode, url ->
+                                val displayTitle = episode?.let { "${item.name} · ${it.title}" } ?: item.name
+                                player.play(
+                                    url,
+                                    title = displayTitle,
+                                    year = item.year,
+                                    isLive = false,
+                                    contentKey = "ONLINE:${item.type}:${episode?.id ?: item.id}",
+                                )
+                                openFullscreen(MainSection.ONLINE)
+                            },
+                            onChildFocused = { focusedLayer = ShellLayer.CONTENT },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+
                         selectedSection == MainSection.DOWNLOADS -> DownloadsScreen(
                             onFullscreen = { openFullscreen() },
                             onChildFocused = { focusedLayer = ShellLayer.CONTENT },
@@ -1173,6 +1190,7 @@ private val MainSection.emptyIcon: OwnTVIcon
         MainSection.LIVE_TV -> OwnTVIcon.LIVE_TV
         MainSection.MOVIES -> OwnTVIcon.MOVIES
         MainSection.SERIES -> OwnTVIcon.SERIES
+        MainSection.ONLINE -> OwnTVIcon.MOVIES
         MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS
         MainSection.EPG -> OwnTVIcon.EPG
         MainSection.SETTINGS -> OwnTVIcon.SETTINGS
@@ -1182,6 +1200,7 @@ private fun railCategoriesFor(section: MainSection): List<RailCategory> = when (
     MainSection.SEARCH -> emptyList()
     MainSection.HOME -> emptyList()
     MainSection.EPG -> emptyList()
+    MainSection.ONLINE -> emptyList()
     MainSection.LIVE_TV -> listOf(
         RailCategory("Favorites", OwnTVIcon.FAVORITE, tv.own.owntv.R.string.content_category_favorites),
         RailCategory("History", OwnTVIcon.HISTORY, tv.own.owntv.R.string.content_category_history),
@@ -1219,7 +1238,7 @@ private fun railCategoriesFor(section: MainSection): List<RailCategory> = when (
 
 @Composable
 private fun placeholderCount(section: MainSection): String = when (section) {
-    MainSection.SEARCH, MainSection.HOME, MainSection.EPG, MainSection.SETTINGS -> ""
+    MainSection.SEARCH, MainSection.HOME, MainSection.ONLINE, MainSection.EPG, MainSection.SETTINGS -> ""
     MainSection.LIVE_TV -> stringResource(R.string.content_zero_channels)
     MainSection.MOVIES -> stringResource(R.string.content_zero_movies)
     MainSection.SERIES -> stringResource(R.string.content_zero_series)

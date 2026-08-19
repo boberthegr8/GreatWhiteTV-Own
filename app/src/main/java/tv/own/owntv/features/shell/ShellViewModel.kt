@@ -48,6 +48,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
     LIVE_TV(tv.own.owntv.R.string.common_nav_live_tv),
     MOVIES(tv.own.owntv.R.string.common_nav_movies),
     SERIES(tv.own.owntv.R.string.common_nav_series),
+    ONLINE(tv.own.owntv.R.string.common_nav_online),
     DOWNLOADS(tv.own.owntv.R.string.common_nav_downloads),
     EPG(tv.own.owntv.R.string.common_nav_guide),
     SETTINGS(tv.own.owntv.R.string.common_nav_settings); // pinned at the bottom of the nav
@@ -57,7 +58,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
 
     companion object {
         /** Fixed order of the browse icons in the rail (Settings is pinned separately at the bottom). */
-        val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, DOWNLOADS, EPG)
+        val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, ONLINE, DOWNLOADS, EPG)
 
         /** All six browse items — the default `visibleSections` value so the rail shows everything until
          *  the first real emission lands (avoids a cold-start flicker to an empty rail). */
@@ -72,6 +73,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
          */
         fun dynamicVisible(hasLive: Boolean, hasMovies: Boolean, hasSeries: Boolean): Set<MainSection> = buildSet {
             add(HOME)
+            add(ONLINE)
             if (hasLive) { add(LIVE_TV); add(EPG) }
             if (hasMovies) add(MOVIES)
             if (hasSeries) add(SERIES)
