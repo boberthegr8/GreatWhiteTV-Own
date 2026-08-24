@@ -16,9 +16,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import tv.own.owntv.features.shell.MainSection
 
 /**
- * Rank 1 — Neo Signal Duotone (Phase 7). SVG shapes from
- * extras/owntv_future_nav_icons_ranked.html, rendered on a crisp 100-unit Canvas grid
- * with clean integer coordinates so icons stay sharp at any UI zoom.
+ * GWS Online navigation glyphs. These stay vector-drawn on a 100-unit grid; the stronger secondary
+ * pass and slightly tighter stroke weights keep the small TV-rail icons crisp instead of hazy.
  */
 @Composable
 fun NavDuotoneIcon(
@@ -28,16 +27,20 @@ fun NavDuotoneIcon(
 ) {
     Canvas(modifier) {
         val s = size.minDimension / 100f
-        val soft = color.copy(alpha = 0.43f)
+        val soft = color.copy(alpha = 0.78f)
         val fill = color
-        val stroke = Stroke(width = 7f * s, cap = StrokeCap.Round, join = StrokeJoin.Round)
-        val thin = Stroke(width = 5f * s, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val stroke = Stroke(width = 6f * s, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val thin = Stroke(width = 4.5f * s, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
         fun o(x: Float, y: Float) = Offset(x * s, y * s)
         fun sz(w: Float, h: Float) = Size(w * s, h * s)
 
         fun poly(vararg pts: Float): Path = Path().apply {
-            var i = 0; while (i < pts.size) { if (i == 0) moveTo(pts[0] * s, pts[1] * s) else lineTo(pts[i] * s, pts[i + 1] * s); i += 2 }
+            var i = 0
+            while (i < pts.size) {
+                if (i == 0) moveTo(pts[0] * s, pts[1] * s) else lineTo(pts[i] * s, pts[i + 1] * s)
+                i += 2
+            }
         }
         fun polyC(vararg pts: Float): Path = poly(*pts).apply { close() }
 
@@ -48,21 +51,20 @@ fun NavDuotoneIcon(
             drawCircle(c, radius = r * s, center = o(cx, cy))
 
         fun DrawScope.arc(c: Color, cx: Float, cy: Float, r: Float, startD: Float, sweepD: Float, st: Stroke) {
-            val tl = o(cx - r, cy - r); drawArc(c, startD, sweepD, false, tl, sz(r * 2, r * 2), style = st)
+            val tl = o(cx - r, cy - r)
+            drawArc(c, startD, sweepD, false, tl, sz(r * 2, r * 2), style = st)
         }
 
         when (section) {
-            // ---- Home — house + roof + signal dash --------------------------------
             MainSection.HOME -> {
                 drawPath(polyC(17f,47f, 50f,17f, 83f,47f, 83f,83f, 17f,83f), soft)
                 drawPath(poly(17f,47f, 50f,17f, 83f,47f), fill, style = stroke)
                 drawPath(poly(27f,83f, 27f,44f), fill, style = stroke)
                 drawPath(poly(73f,83f, 73f,44f), fill, style = stroke)
-                drawPath(poly(42f,42f, 58f,42f), fill, style = stroke) // signal dash
+                drawPath(poly(42f,42f, 58f,42f), fill, style = stroke)
                 drawPath(polyC(40f,83f, 40f,61f, 60f,61f, 60f,83f), soft)
             }
 
-            // ---- Live TV — screen + stand + broadcast arcs -----------------------
             MainSection.LIVE_TV -> {
                 rect(17f, 29f, 67f, 44f, 10f, fill, stroke)
                 drawPath(polyC(46f,42f, 46f,60f, 62f,51f), fill, style = Fill)
@@ -73,7 +75,6 @@ fun NavDuotoneIcon(
                 dot(50f, 22f, 2.5f, fill)
             }
 
-            // ---- Movies — film strip sprocket + play ------------------------------
             MainSection.MOVIES, MainSection.ONLINE -> {
                 drawPath(polyC(21f,33f, 76f,21f, 79f,36f, 24f,48f), soft)
                 drawPath(poly(33f,30f, 44f,43f), soft, style = thin)
@@ -83,7 +84,6 @@ fun NavDuotoneIcon(
                 drawPath(polyC(46f,55f, 46f,70f, 60f,62f), fill, style = Fill)
             }
 
-            // ---- Series — stacked screens + episode dots --------------------------
             MainSection.SERIES -> {
                 rect(21f, 24f, 53f, 37f, 8f, soft, stroke)
                 rect(30f, 36f, 49f, 40f, 9f, fill, stroke)
@@ -94,18 +94,16 @@ fun NavDuotoneIcon(
                 dot(63f, 83f, 3f, soft)
             }
 
-            // ---- Downloads — down-arrow tray + accent arcs -----------------------
             MainSection.DOWNLOADS -> {
                 drawPath(poly(50f,19f, 50f,58f), fill, style = stroke)
                 drawPath(poly(35f,43f, 50f,58f, 65f,43f), fill, style = stroke)
                 drawPath(poly(23f,73f, 23f,80f, 77f,80f, 77f,73f), soft, style = stroke)
                 drawPath(poly(31f,85f, 69f,85f), soft, style = stroke)
-                arc(soft, 21f, 16f, 12f, 220f, 90f, thin) // left accent
-                arc(soft, 79f, 16f, 12f, 50f, 90f, thin)  // right accent
+                arc(soft, 21f, 16f, 12f, 220f, 90f, thin)
+                arc(soft, 79f, 16f, 12f, 50f, 90f, thin)
                 dot(50f, 67f, 3f, fill)
             }
 
-            // ---- Guide — grid with channel blocks + dot --------------------------
             MainSection.EPG -> {
                 rect(17f, 21f, 67f, 63f, 10f, fill, stroke)
                 drawPath(poly(33f,21f, 33f,83f), fill, style = stroke)
@@ -117,7 +115,6 @@ fun NavDuotoneIcon(
                 dot(25f, 32f, 3f, fill)
             }
 
-            // ---- Search — magnifier + corner brackets + dash ---------------------
             MainSection.SEARCH -> {
                 drawCircle(fill, radius = 24f * s, center = o(45f, 45f), style = stroke)
                 drawPath(poly(63f,63f, 82f,82f), fill, style = stroke)
@@ -128,7 +125,6 @@ fun NavDuotoneIcon(
                 drawPath(poly(35f,45f, 55f,45f), soft, style = stroke)
             }
 
-            // ---- Settings — sliders + orbit accent --------------------------------
             MainSection.SETTINGS -> {
                 drawPath(poly(20f,33f, 59f,33f), fill, style = stroke)
                 drawPath(poly(72f,33f, 83f,33f), fill, style = stroke)
@@ -142,29 +138,23 @@ fun NavDuotoneIcon(
     }
 }
 
-/**
- * Rank 1 — Profile icon (Phase 7). Person silhouette + star accent on 100-grid.
- */
 @Composable
 fun ProfileIcon(color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier) {
         val s = size.minDimension / 100f
-        val soft = color.copy(alpha = 0.43f)
+        val soft = color.copy(alpha = 0.78f)
         val fill = color
-        val stroke = Stroke(width = 7f * s, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val stroke = Stroke(width = 6f * s, cap = StrokeCap.Round, join = StrokeJoin.Round)
 
         fun o(x: Float, y: Float) = Offset(x * s, y * s)
 
-        // Head — circle
         drawCircle(fill, radius = 13f * s, center = o(50f, 38f), style = stroke)
-        // Body arc — cubic bezier
         val body = Path().apply {
             moveTo(24f * s, 81f * s)
             cubicTo(28f * s, 67f * s, 37f * s, 60f * s, 50f * s, 60f * s)
             cubicTo(63f * s, 60f * s, 72f * s, 67f * s, 76f * s, 81f * s)
         }
         drawPath(body, fill, style = stroke)
-        // Star accent
         val star = Path().apply {
             moveTo(76f * s, 19f * s); lineTo(78f * s, 24f * s); lineTo(83f * s, 26f * s)
             lineTo(78f * s, 28f * s); lineTo(76f * s, 33f * s); lineTo(74f * s, 28f * s)
