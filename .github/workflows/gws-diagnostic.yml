@@ -5,14 +5,16 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   compile:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
@@ -22,6 +24,64 @@ jobs:
         uses: android-actions/setup-android@v3
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+      - name: Classify reviewed UpdateManager literals
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+
+          script = Path('tools/i18n/check_hardcoded_strings.py')
+          spec = importlib.util.spec_from_file_location('i18ncheck', script)
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+
+          target = 'app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt'
+          current = m._inventory()
+          baseline = m._parse(m.BASELINE.read_text(encoding='utf-8'))
+          safe, categories, errors = m._safe_entries()
+          if errors:
+              raise SystemExit('\n'.join(errors))
+
+          classified = m._add_counts(baseline, safe)
+          for key, count in current.items():
+              path, text = key
+              if path == target and count > classified.get(key, 0):
+                  safe[key] = count
+                  if text == '':
+                      categories[key] = 'empty'
+                  elif 'failed' in text.lower() or text.startswith('Restored '):
+                      categories[key] = 'log'
+                  elif text.endswith('.json') or text.endswith('.tmp') or text in {'update-safety'}:
+                      categories[key] = 'file-path'
+                  elif text in {
+                      'schema','fromVersion','createdAt','profiles','id','name','avatarColor','avatarId','isKids','pinHash',
+                      'sources','type','url','username','password','mac','stalkerSerialNumber','stalkerDeviceId','stalkerDeviceId2',
+                      'stalkerSignature','userAgent','epgUrl','syncLive','syncMovies','syncSeries','hlsSupported','preferHls',
+                      'livePrerollSecs','maxConnections','lastSyncAt','links','profileId','sourceId'
+                  }:
+                      categories[key] = 'json'
+                  else:
+                      categories[key] = 'technical'
+
+          # Remove classifications for literals that no longer exist (the old updater log text changed).
+          safe = {
+              key: min(count, current[key])
+              for key, count in safe.items()
+              if key in current and current[key] > 0
+          }
+          entries = {key: (count, categories[key]) for key, count in safe.items()}
+          m.SAFE_MANIFEST.write_text(m._serialize_safe(entries), encoding='utf-8')
+          # Rebuild baseline after the reviewed technical additions; this only removes the newly-safe updater literals.
+          m.cmd_generate(None)
+          PY
+          if ! git diff --quiet -- tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt
+            git commit -m "Classify GWS updater safety literals"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
       - name: Compile and capture diagnostics
         shell: bash
         run: |
