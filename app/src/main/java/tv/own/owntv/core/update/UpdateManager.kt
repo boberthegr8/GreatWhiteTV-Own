@@ -13,16 +13,25 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
+import org.koin.core.context.GlobalContext
 import tv.own.owntv.BuildConfig
+import tv.own.owntv.core.database.dao.ProfileDao
+import tv.own.owntv.core.database.dao.SourceDao
+import tv.own.owntv.core.database.entity.ProfileEntity
+import tv.own.owntv.core.database.entity.ProfileSourceCrossRef
+import tv.own.owntv.core.database.entity.SourceEntity
+import tv.own.owntv.core.model.HlsSupport
+import tv.own.owntv.core.model.SourceType
 import java.io.File
 import java.io.IOException
 
 /**
- * Manual in-app updates straight from GWS Online's GitHub Releases: checks this repo's latest
- * release only when the user explicitly asks, compares its tag with the installed version, downloads
- * the release APK, and hands it to the system installer. The release workflow publishes a stable
- * `GWSOnline.apk` for real Android TV / Fire TV devices plus a separate x86_64 APK for emulators.
+ * In-app updates straight from GWS Online's GitHub Releases. Startup and manual checks share the same
+ * release path, and every install is preceded by an app-private playlist/account safety snapshot.
+ * Android normally preserves Room data during an in-place update; the snapshot is a fallback that is
+ * restored automatically on the first launch of the new version only if the source table is empty.
  */
 class UpdateManager(
     private val context: Context,
@@ -51,6 +60,8 @@ class UpdateManager(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val sourceDao: SourceDao by lazy { GlobalContext.get().get() }
+    private val profileDao: ProfileDao by lazy { GlobalContext.get().get() }
 
     private val _state = MutableStateFlow<State>(State.Idle)
     val state: StateFlow<State> = _state.asStateFlow()
@@ -72,15 +83,20 @@ class UpdateManager(
 
     val currentVersion: String = BuildConfig.VERSION_NAME
 
-    /**
-     * Legacy startup hook retained so an older shell/settings preference cannot trigger an update check.
-     * GWS Online updates are manual-only: callers that represent an explicit user action must use
-     * [checkManual]. This is intentionally a true no-op so it cannot interrupt a manual check already
-     * in progress during the first few seconds after app launch.
-     */
-    fun check() = Unit
+    init {
+        // The new package has already replaced the old one when this runs. If Android/Room retained the
+        // sources (normal case), the safety snapshot is simply discarded. If they disappeared, restore
+        // the playlists, credentials and profile links without sending the user through setup again.
+        scope.launch {
+            runCatching { restorePlaylistSnapshotIfNeeded() }
+                .onFailure { Log.e(TAG, "playlist safety restore failed", it) }
+        }
+    }
 
-    /** Queries GWS Online's latest release after an explicit user action. */
+    /** Startup check used by the shell. Future releases now surface automatically after launch. */
+    fun check() = checkManual()
+
+    /** Queries GWS Online's latest release. */
     fun checkManual() {
         if (_state.value is State.Checking || _state.value is State.Downloading) return
         _state.value = State.Checking
@@ -100,9 +116,6 @@ class UpdateManager(
                         ?: throw InvalidReleaseResponseException()
                     val notes = o.optString("body").take(16_000)
                     val assets = o.optJSONArray("assets") ?: throw InvalidReleaseResponseException()
-                    // GWS Online releases carry a stable ARM APK named GWSOnline.apk plus a versioned
-                    // x86_64 APK. Older filenames remain accepted only as compatibility bridges so
-                    // already-installed Great White / OwnTV-branded builds can update in place.
                     val wantX86 = android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"
                     val candidates = (0 until assets.length())
                         .asSequence()
@@ -126,13 +139,13 @@ class UpdateManager(
                     else _state.value = State.UpToDate
                 }
             }.onFailure { error ->
-                Log.w(TAG, "manual update check failed: ${error.message}", error)
+                Log.w(TAG, "update check failed: ${error.message}", error)
                 _state.value = State.Failed(failureFor(error, checking = true))
             }
         }
     }
 
-    /** Downloads the release APK with progress, then opens the system installer. */
+    /** Downloads the release APK with progress, snapshots playlists, then opens the system installer. */
     fun downloadAndInstall() {
         val info = (_state.value as? State.Available)?.info ?: return
         _state.value = State.Downloading(0)
@@ -160,10 +173,14 @@ class UpdateManager(
                     }
                     if (copied == 0L) throw EmptyDownloadException()
                 }
+
+                // Never hand the APK to Android until the active playlist/account definitions are safely
+                // serialized. This includes Xtream/Stalker credentials and profile-to-source links.
+                runCatching { snapshotPlaylistState() }.getOrElse { throw InstallException(it) }
                 runCatching { install(out) }.getOrElse { throw InstallException(it) }
                 _state.value = State.Available(info)
             }.onFailure { error ->
-                Log.w(TAG, "update download failed: ${error.message}", error)
+                Log.w(TAG, "update download/install failed: ${error.message}", error)
                 val failure = if (error is InstallException) Failure.Install else failureFor(error, checking = false)
                 _state.value = State.Failed(failure, retryInfo = info)
             }
@@ -178,6 +195,172 @@ class UpdateManager(
         }
         context.startActivity(intent)
     }
+
+    private fun safetyFile(): File {
+        val dir = File(context.filesDir, "update-safety").apply { mkdirs() }
+        return File(dir, "playlist-snapshot.json")
+    }
+
+    private suspend fun snapshotPlaylistState() {
+        val sources = sourceDao.getAllOnce()
+        val profiles = profileDao.getAllOnce()
+        val links = sourceDao.allLinks()
+
+        val root = JSONObject()
+            .put("schema", 1)
+            .put("fromVersion", currentVersion)
+            .put("createdAt", System.currentTimeMillis())
+            .put("profiles", JSONArray().apply {
+                profiles.forEach { p ->
+                    put(JSONObject()
+                        .put("id", p.id)
+                        .put("name", p.name)
+                        .put("avatarColor", p.avatarColor)
+                        .put("avatarId", p.avatarId)
+                        .put("isKids", p.isKids)
+                        .putNullable("pinHash", p.pinHash)
+                        .put("createdAt", p.createdAt))
+                }
+            })
+            .put("sources", JSONArray().apply {
+                sources.forEach { s ->
+                    put(JSONObject()
+                        .put("id", s.id)
+                        .put("name", s.name)
+                        .put("type", s.type.name)
+                        .put("url", s.url)
+                        .putNullable("username", s.username)
+                        .putNullable("password", s.password)
+                        .putNullable("mac", s.mac)
+                        .putNullable("stalkerSerialNumber", s.stalkerSerialNumber)
+                        .putNullable("stalkerDeviceId", s.stalkerDeviceId)
+                        .putNullable("stalkerDeviceId2", s.stalkerDeviceId2)
+                        .putNullable("stalkerSignature", s.stalkerSignature)
+                        .putNullable("userAgent", s.userAgent)
+                        .putNullable("epgUrl", s.epgUrl)
+                        .put("syncLive", s.syncLive)
+                        .put("syncMovies", s.syncMovies)
+                        .put("syncSeries", s.syncSeries)
+                        .put("hlsSupported", s.hlsSupported.code)
+                        .put("preferHls", s.preferHls)
+                        .put("livePrerollSecs", s.livePrerollSecs)
+                        .put("maxConnections", s.maxConnections)
+                        .put("createdAt", s.createdAt)
+                        .putNullableLong("lastSyncAt", s.lastSyncAt))
+                }
+            })
+            .put("links", JSONArray().apply {
+                links.forEach { link ->
+                    put(JSONObject().put("profileId", link.profileId).put("sourceId", link.sourceId))
+                }
+            })
+
+        val target = safetyFile()
+        val temp = File(target.parentFile, "${target.name}.tmp")
+        temp.writeText(root.toString())
+        if (!temp.renameTo(target)) {
+            target.writeText(temp.readText())
+            temp.delete()
+        }
+    }
+
+    private suspend fun restorePlaylistSnapshotIfNeeded() {
+        val file = safetyFile()
+        if (!file.isFile) return
+        val root = runCatching { JSONObject(file.readText()) }.getOrElse {
+            file.delete()
+            return
+        }
+
+        // Same-version relaunch means the installer never completed; retain the snapshot for a retry.
+        val fromVersion = root.optString("fromVersion")
+        if (fromVersion.isBlank() || fromVersion == currentVersion) return
+
+        // Normal Android update: data survived. Snapshot has served its purpose and can be removed.
+        if (sourceDao.getAllOnce().isNotEmpty()) {
+            file.delete()
+            return
+        }
+
+        val profiles = root.optJSONArray("profiles") ?: JSONArray()
+        for (i in 0 until profiles.length()) {
+            val p = profiles.optJSONObject(i) ?: continue
+            val id = p.optLong("id", 0L)
+            if (id <= 0L || profileDao.getById(id) != null) continue
+            profileDao.insert(
+                ProfileEntity(
+                    id = id,
+                    name = p.optString("name", "GWS Online"),
+                    avatarColor = p.optInt("avatarColor", 0),
+                    avatarId = p.optInt("avatarId", 0),
+                    isKids = p.optBoolean("isKids", false),
+                    pinHash = p.nullableString("pinHash"),
+                    createdAt = p.optLong("createdAt", System.currentTimeMillis()),
+                ),
+            )
+        }
+
+        val restoredSourceIds = mutableSetOf<Long>()
+        val sources = root.optJSONArray("sources") ?: JSONArray()
+        for (i in 0 until sources.length()) {
+            val s = sources.optJSONObject(i) ?: continue
+            val id = s.optLong("id", 0L)
+            if (id <= 0L) continue
+            val type = runCatching { SourceType.valueOf(s.optString("type")) }.getOrNull() ?: continue
+            sourceDao.insert(
+                SourceEntity(
+                    id = id,
+                    name = s.optString("name", "Playlist"),
+                    type = type,
+                    url = s.optString("url", ""),
+                    username = s.nullableString("username"),
+                    password = s.nullableString("password"),
+                    mac = s.nullableString("mac"),
+                    stalkerSerialNumber = s.nullableString("stalkerSerialNumber"),
+                    stalkerDeviceId = s.nullableString("stalkerDeviceId"),
+                    stalkerDeviceId2 = s.nullableString("stalkerDeviceId2"),
+                    stalkerSignature = s.nullableString("stalkerSignature"),
+                    userAgent = s.nullableString("userAgent"),
+                    epgUrl = s.nullableString("epgUrl"),
+                    syncLive = s.optBoolean("syncLive", true),
+                    syncMovies = s.optBoolean("syncMovies", true),
+                    syncSeries = s.optBoolean("syncSeries", true),
+                    hlsSupported = HlsSupport.fromCode(s.optInt("hlsSupported", HlsSupport.UNKNOWN.code)),
+                    preferHls = s.optBoolean("preferHls", false),
+                    livePrerollSecs = s.optInt("livePrerollSecs", -1),
+                    maxConnections = s.optInt("maxConnections", 0),
+                    createdAt = s.optLong("createdAt", System.currentTimeMillis()),
+                    lastSyncAt = s.nullableLong("lastSyncAt"),
+                ),
+            )
+            restoredSourceIds += id
+        }
+
+        val links = root.optJSONArray("links") ?: JSONArray()
+        for (i in 0 until links.length()) {
+            val link = links.optJSONObject(i) ?: continue
+            val profileId = link.optLong("profileId", 0L)
+            val sourceId = link.optLong("sourceId", 0L)
+            if (sourceId in restoredSourceIds && profileId > 0L && profileDao.getById(profileId) != null) {
+                sourceDao.link(ProfileSourceCrossRef(profileId = profileId, sourceId = sourceId))
+            }
+        }
+
+        file.delete()
+        Log.i(TAG, "Restored ${restoredSourceIds.size} playlist source(s) from update safety snapshot")
+    }
+
+    private fun JSONObject.putNullable(key: String, value: String?): JSONObject =
+        put(key, value ?: JSONObject.NULL)
+
+    private fun JSONObject.putNullableLong(key: String, value: Long?): JSONObject =
+        put(key, value ?: JSONObject.NULL)
+
+    private fun JSONObject.nullableString(key: String): String? =
+        if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
+
+    private fun JSONObject.nullableLong(key: String): Long? =
+        if (!has(key) || isNull(key)) null else optLong(key)
 
     /** Retries the failed phase without losing a successfully resolved release asset. */
     fun retry() {
