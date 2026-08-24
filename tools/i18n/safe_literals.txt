@@ -2648,28 +2648,68 @@
 1	log	app/src/main/java/tv/own/owntv/core/tv/TvHomeRepository.kt	syncMovie profile=$profileId movieId=$movieId groupId=$groupId existing=${existing?.providerProgramId ?: -1}
 1	log	app/src/main/java/tv/own/owntv/core/tv/TvHomeRepository.kt	syncMovie skip hidden profile=$profileId movieId=$movieId sourceId=${movie.sourceId}
 1	log	app/src/main/java/tv/own/owntv/core/tv/TvHomeRepository.kt	syncMovie skip user-hidden profile=$profileId movieId=$movieId groupId=$groupId
+1	empty	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	${context.packageName}.fileprovider
+1	file-path	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	${target.name}.tmp
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	.apk
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	Accept
+1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	GWS Online
 2	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	GWSOnline
 1	file-path	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	GWSOnline.apk
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	GreatWhiteTV.apk
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	OwnTV.apk
+1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	Playlist
+1	log	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	Restored ${restoredSourceIds.size} playlist source(s) from update safety snapshot
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	UpdateManager
 2	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	User-Agent
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	application/vnd.android.package-archive
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	application/vnd.github+json
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	assets
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	avatarColor
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	avatarId
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	boberthegr8/GreatWhiteTV-Own
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	body
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	browser_download_url
+5	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	createdAt
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	epgUrl
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	fromVersion
 1	file-path	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	gws-online-update.apk
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	hlsSupported
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	https://api.github.com/repos/$REPO/releases/latest
-1	log	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	manual update check failed: ${error.message}
-1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	name
+4	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	id
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	isKids
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	lastSyncAt
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	links
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	livePrerollSecs
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	mac
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	maxConnections
+5	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	name
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	password
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	pinHash
+1	log	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	playlist safety restore failed
+1	file-path	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	playlist-snapshot.json
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	preferHls
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	profileId
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	profiles
+1	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	schema
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	sourceId
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	sources
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	stalkerDeviceId
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	stalkerDeviceId2
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	stalkerSerialNumber
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	stalkerSignature
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	syncLive
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	syncMovies
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	syncSeries
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	tag_name
-1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	update download failed: ${error.message}
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	type
+1	log	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	update check failed: ${error.message}
+1	log	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	update download/install failed: ${error.message}
+1	file-path	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	update-safety
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	updates
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	url
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	userAgent
+2	json	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	username
 1	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	v
 3	technical	app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt	x86_64
 1	protocol	app/src/main/java/tv/own/owntv/core/util/ErrorMessages.kt	CertPath

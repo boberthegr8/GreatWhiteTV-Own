@@ -247,6 +247,11 @@
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	ExoPlayer error before first frame: ${info?.raw ?: previewEngine.error.value}
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv handoff for '${channel.name}' abandoned — the channel changed while ExoPlayer released
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	starting mpv for '${channel.name}' — reason=$reason
+1	app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt	WatchHub
+1	app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt	movie
+1	app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt	org.stremio.watchhub
+1	app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt	series
+1	app/src/main/java/tv/own/owntv/features/online/OnlineAddonStore.kt	stream
 1	app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt	${cfg.host}$p
 1	app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt	:${cfg.port}
 2	app/src/main/java/tv/own/owntv/features/settings/DnsSettingsScreen.kt	https://
@@ -294,6 +299,7 @@
 1	app/src/main/java/tv/own/owntv/features/settings/data/SubtitleStyle.kt	top_left
 1	app/src/main/java/tv/own/owntv/features/settings/data/SubtitleStyle.kt	top_right
 1	app/src/main/java/tv/own/owntv/features/shell/components/MediaDetailsScreen.kt	\0
+1	app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt	gwsSidebarWidth
 3	app/src/main/java/tv/own/owntv/player/LivePreviewEngine.kt	\0
 1	app/src/main/java/tv/own/owntv/player/LivePreviewEngine.kt	Content-Type
 1	app/src/main/java/tv/own/owntv/player/LivePreviewEngine.kt	HLS
