@@ -1,6 +1,7 @@
 package tv.own.owntv.features.shell.components
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -34,6 +35,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,7 +50,6 @@ import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.NavAccentBar
 import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVAvatar
-import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.RailPanelFill
 import tv.own.owntv.ui.components.rememberNavLadderColors
 import tv.own.owntv.ui.components.roundedPanel
@@ -88,11 +89,14 @@ fun Sidebar(
         label = "gwsSidebarWidth",
     )
 
+    // EPG is now the Live TV surface. Keep the old enum value as an internal compatibility alias so
+    // saved state/deep links from older builds remain harmless, but never expose a second Guide item.
     val focusSection = when {
         selected == MainSection.SEARCH -> MainSection.HOME
+        selected == MainSection.EPG -> MainSection.LIVE_TV
         selected == MainSection.SETTINGS -> MainSection.SETTINGS
         selected in visibleSections -> selected
-        else -> MainSection.browseOrder.firstOrNull { it in visibleSections } ?: MainSection.SETTINGS
+        else -> MainSection.browseOrder.firstOrNull { it != MainSection.EPG && it in visibleSections } ?: MainSection.SETTINGS
     }
 
     Column(
@@ -127,10 +131,10 @@ fun Sidebar(
                     Spacer(Modifier.height(6.dp))
                 }
 
-                MainSection.browseOrder.filter { it in visibleSections }.forEach { section ->
+                MainSection.browseOrder.filter { it != MainSection.EPG && it in visibleSections }.forEach { section ->
                     NavItem(
                         section = section,
-                        active = section == selected,
+                        active = section == selected || (section == MainSection.LIVE_TV && selected == MainSection.EPG),
                         expanded = expanded,
                         count = counts(section),
                         onClick = { onSelect(section) },
@@ -182,11 +186,10 @@ private fun AppLogo(modifier: Modifier = Modifier) {
             .border(width = 2.dp, color = colors.primary, shape = RoundedCornerShape(20.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        OwnTVIcon(
-            icon = OwnTVIcon.PLAY,
-            tint = colors.primary,
-            modifier = Modifier.size(26.dp),
-            filled = true,
+        Image(
+            painter = painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = stringResource(R.string.gws_app_name),
+            modifier = Modifier.size(52.dp),
         )
     }
 }
@@ -232,7 +235,7 @@ private fun ProfileCard(
             OwnTVAvatar(avatarId = avatarId, modifier = Modifier.size(42.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    profileName.ifBlank { stringResource(R.string.common_own_tv_user) },
+                    profileName.ifBlank { stringResource(R.string.gws_app_name) },
                     style = MaterialTheme.typography.labelLarge,
                     color = if (focused) colors.onSurface else colors.onSurfaceVariant,
                     fontWeight = FontWeight.SemiBold,
