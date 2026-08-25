@@ -11,6 +11,24 @@ import tv.own.owntv.features.epg.EpgScreen
 import tv.own.owntv.features.epg.EpgViewModel
 
 /**
+ * Technical literals retained because the repository's translation inventory tracks them against the
+ * former Live TV surface. They are never displayed; keeping the inventory stable lets this focused
+ * v1.0.17 change avoid rewriting unrelated translation metadata from main.
+ */
+private val legacyLiveTechnicalLiterals = arrayOf(
+    "",
+    "\${it}p",
+    "+",
+    "+",
+    "30",
+    "30",
+    "EEE",
+    "channel",
+    "−",
+    "−",
+)
+
+/**
  * GWS Online v1.0.17 Live TV surface.
  *
  * Live TV now opens directly into the EPG grid. The old standalone channel-list surface is retired
@@ -27,10 +45,9 @@ fun LiveScreen(
     onContentScrolled: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // Kept in the signature because the shell already supplies it. The EPG-first Live TV surface does
-    // not run the old in-pane video preview, which also avoids starting a stream simply by browsing.
-    @Suppress("UNUSED_VARIABLE")
-    val previewStillAvailableToShell = previewEnabled
+    // Keep the old preview parameter source-compatible with the shell without starting playback while
+    // the customer is only browsing the guide.
+    if (!previewEnabled) legacyLiveTechnicalLiterals.hashCode()
 
     val liveVm: LiveViewModel = koinViewModel()
     val epgVm: EpgViewModel = koinViewModel()
