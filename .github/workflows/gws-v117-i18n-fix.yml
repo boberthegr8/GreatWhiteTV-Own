@@ -35,11 +35,11 @@ jobs:
       - name: Commit inventory
         run: |
           set -euo pipefail
-          if git diff --quiet -- tools/i18n/safe_literals.txt tools/i18n/baseline.txt; then
+          if git diff --quiet -- tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt; then
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add tools/i18n/safe_literals.txt tools/i18n/baseline.txt
+          git add tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt
           git commit -m 'Classify GWS v1.0.17 Live TV technical literals [skip ci]'
           git push origin HEAD:gws-v1.0.17-live-tv-speed
