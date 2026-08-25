@@ -45,8 +45,7 @@ enum class AccentColor(
         primaryDark = Color(0xFF6FDB94), onPrimaryDark = Color(0xFF00391C),
         primaryContainerDark = Color(0xFF1F5135), onPrimaryContainerDark = Color(0xFF8BF8AF),
         primaryLight = Color(0xFF1B6B3F), onPrimaryLight = Color(0xFFFFFFFF),
-        primaryContainerLight = Color(0xFFA6F2C0), onPrimaryLight = Color(0xFFFFFFFF),
-        onPrimaryContainerLight = Color(0xFF00210F),
+        primaryContainerLight = Color(0xFFA6F2C0), onPrimaryContainerLight = Color(0xFF00210F),
     ),
     AMBER(
         R.string.settings_accent_amber,
