@@ -1,0 +1,239 @@
+name: GWS Online v1.0.15 verified release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/GWS_V115_FINAL_TRIGGER'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gws-release-v115-final
+  cancel-in-progress: false
+
+env:
+  VERSION_NAME: '1.0.15'
+  VERSION_CODE: '10015'
+  EXPECTED_CERT_SHA256: 'EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C'
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify GWS source invariants
+        run: |
+          set -euo pipefail
+          grep -Fq 'val RailWidthFixed = 180.dp' app/src/main/java/tv/own/owntv/ui/theme/Dimens.kt
+          grep -Fq 'val ChannelListWidth = 450.dp' app/src/main/java/tv/own/owntv/ui/theme/Dimens.kt
+          grep -Fq '<string name="app_name" translatable="false">GWS Online</string>' app/src/main/res/values/donottranslate.xml
+          grep -Fq 'android:banner="@drawable/gws_tv_banner"' app/src/main/AndroidManifest.xml
+          echo 'GWS Online layout, label and GWS banner verified.'
+
+      - name: Publish one-time signing handoff key
+        run: |
+          set -euo pipefail
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /tmp/gws_private.pem 2>/dev/null
+          openssl pkey -in /tmp/gws_private.pem -pubout -out /tmp/gws_public.pem 2>/dev/null
+          git fetch origin main
+          git checkout -B main origin/main
+          mkdir -p .github/gws-handoff
+          cp /tmp/gws_public.pem ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem"
+          printf '%s\n' "$GITHUB_RUN_ID" > .github/GWS_V115_FINAL_ACTIVE_RUN.txt
+          git config user.name 'GWS Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .github/gws-handoff .github/GWS_V115_FINAL_ACTIVE_RUN.txt
+          git commit -m "Publish GWS v1.0.15 one-time signing key for run ${GITHUB_RUN_ID} [skip ci]"
+          git push origin HEAD:main
+
+      - name: Wait for encrypted signing bundle
+        run: |
+          set -euo pipefail
+          found=0
+          for i in $(seq 1 240); do
+            git fetch -q origin main
+            P=".github/gws-handoff/payload-${GITHUB_RUN_ID}.b64"
+            K=".github/gws-handoff/key-${GITHUB_RUN_ID}.b64"
+            I=".github/gws-handoff/iv-${GITHUB_RUN_ID}.hex"
+            if git show "origin/main:$P" > /tmp/payload.b64 2>/dev/null \
+              && git show "origin/main:$K" > /tmp/aeskey.b64 2>/dev/null \
+              && git show "origin/main:$I" > /tmp/iv.hex 2>/dev/null; then
+              found=1
+              break
+            fi
+            sleep 5
+          done
+          test "$found" = '1'
+
+      - name: Recover and verify original GWS signing key
+        run: |
+          set -euo pipefail
+          base64 -d /tmp/aeskey.b64 > /tmp/aeskey.enc
+          base64 -d /tmp/payload.b64 > /tmp/payload.enc
+          openssl pkeyutl -decrypt \
+            -inkey /tmp/gws_private.pem \
+            -in /tmp/aeskey.enc \
+            -out /tmp/aeskey.bin \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256
+          AES_HEX=$(od -An -tx1 -v /tmp/aeskey.bin | tr -d ' \n')
+          IV_HEX=$(tr -d '[:space:]' < /tmp/iv.hex)
+          openssl enc -d -aes-256-cbc -K "$AES_HEX" -iv "$IV_HEX" -in /tmp/payload.enc -out /tmp/signing-bundle.zip
+          mkdir -p /tmp/gws-signing
+          unzip -q /tmp/signing-bundle.zip -d /tmp/gws-signing
+          test -s /tmp/gws-signing/signing/GreatWhiteTV-release.jks
+          test -s /tmp/gws-signing/signing.env
+          set -a
+          . /tmp/gws-signing/signing.env
+          set +a
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          echo "::add-mask::$KEY_PASSWORD"
+          CERT=$(keytool -list -v -keystore /tmp/gws-signing/signing/GreatWhiteTV-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>/dev/null | sed -n 's/.*SHA256: //p' | head -n1 | tr -d ':' | tr '[:lower:]' '[:upper:]')
+          echo "Recovered GWS certificate: $CERT"
+          test "$CERT" = "$EXPECTED_CERT_SHA256"
+          echo 'KEYSTORE_FILE=/tmp/gws-signing/signing/GreatWhiteTV-release.jks' >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build GWS Online ARM release APK
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          env -u KEYSTORE_FILE -u KEYSTORE_PASSWORD -u KEY_ALIAS -u KEY_PASSWORD ./gradlew :app:assembleStandardRelease --stacktrace
+          UNSIGNED=$(find app/build/outputs/apk/standard/release -maxdepth 1 -type f -name '*.apk' | head -n1)
+          test -n "$UNSIGNED"
+          test -s "$UNSIGNED"
+          echo "UNSIGNED_APK=$UNSIGNED" >> "$GITHUB_ENV"
+
+      - name: Sign GWS Online with original certificate
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          test -x "$APKSIGNER"
+          mkdir -p dist
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE_FILE" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out dist/GWSOnline.apk \
+            "$UNSIGNED_APK"
+          test -s dist/GWSOnline.apk
+
+      - name: Verify final APK identity and branding
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          "$APKSIGNER" verify --verbose --print-certs dist/GWSOnline.apk 2>&1 | tee /tmp/apksigner.txt
+          ACTUAL=$(python3 - <<'PY'
+          import re
+          text = open('/tmp/apksigner.txt', encoding='utf-8', errors='replace').read()
+          m = re.search(r'certificate\s+SHA-256\s+digest\s*:\s*([0-9A-Fa-f:]+)', text, re.I)
+          print(re.sub(r'[^0-9A-Fa-f]', '', m.group(1)).upper() if m else '')
+          PY
+          )
+          echo "Final APK certificate: $ACTUAL"
+          test "$ACTUAL" = "$EXPECTED_CERT_SHA256"
+          APPT=$("$ANDROID_HOME/cmdline-tools/latest/bin/apkanalyzer" manifest application-id dist/GWSOnline.apk 2>/dev/null || true)
+          echo "APK applicationId: $APPT"
+          test "$APPT" = 'tv.own.owntv'
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n1)
+          "$AAPT" dump badging dist/GWSOnline.apk > /tmp/badging.txt
+          grep -Fq "application-label:'GWS Online'" /tmp/badging.txt
+          echo "APK_CERT_SHA256=$ACTUAL" >> "$GITHUB_ENV"
+          echo 'Final APK package, signer and GWS Online label verified.'
+
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          cp dist/GWSOnline.apk dist/GWSOnline-v1.0.15.apk
+          sha256sum dist/GWSOnline.apk | awk '{print $1}' > dist/GWSOnline.sha256
+          cat dist/GWSOnline.sha256
+          ls -lh dist
+
+      - name: Upload signed APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GWSOnline-v1.0.15-signed
+          path: |
+            dist/GWSOnline.apk
+            dist/GWSOnline-v1.0.15.apk
+            dist/GWSOnline.sha256
+          if-no-files-found: error
+
+      - name: Publish GWS Online v1.0.15
+        run: |
+          set -euo pipefail
+          NOTES=$'GWS Online v1.0.15\n\n- Sliding compact navigation rail that expands on D-pad focus.\n- Cleaner, sharper sidebar icons.\n- Removes the redundant Home chip.\n- Keeps the approved 180dp category and 450dp channel/content sizing.\n- Enables startup update checks.\n- Adds a pre-update playlist/account safety snapshot and automatic restore if an in-place update ever returns with an empty source database.\n- Keeps GWS Online branding, Online movies/series, package ID and original signing certificate for in-place updates.'
+          if gh release view v1.0.15 >/dev/null 2>&1; then
+            gh release upload v1.0.15 dist/GWSOnline.apk dist/GWSOnline-v1.0.15.apk dist/GWSOnline.sha256 --clobber
+            gh release edit v1.0.15 --title 'GWS Online v1.0.15' --notes "$NOTES" --latest
+          else
+            gh release create v1.0.15 dist/GWSOnline.apk dist/GWSOnline-v1.0.15.apk dist/GWSOnline.sha256 --target main --title 'GWS Online v1.0.15' --notes "$NOTES" --latest
+          fi
+
+      - name: Verify public updater URL
+        run: |
+          set -euo pipefail
+          EXPECTED=$(cat dist/GWSOnline.sha256)
+          URL='https://github.com/boberthegr8/GreatWhiteTV-Own/releases/latest/download/GWSOnline.apk'
+          ok=0
+          for i in $(seq 1 24); do
+            rm -f /tmp/downloader-test.apk
+            if curl -fL --connect-timeout 15 --max-time 120 -A 'GWSOnline/1.0.12' -H 'Accept: */*' "$URL" -o /tmp/downloader-test.apk; then
+              GOT=$(sha256sum /tmp/downloader-test.apk | awk '{print $1}')
+              if [ "$GOT" = "$EXPECTED" ]; then ok=1; break; fi
+            fi
+            sleep 5
+          done
+          test "$ok" = '1'
+          echo 'PUBLIC_URLS_OK=true' >> "$GITHUB_ENV"
+          echo 'Latest updater URL verified byte-for-byte.'
+
+      - name: Record result and clean one-time handoff
+        if: always()
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          rm -f .github/GWS_V115_FINAL_TRIGGER .github/GWS_V115_FINAL_ACTIVE_RUN.txt
+          rm -f ".github/gws-handoff/public-${GITHUB_RUN_ID}.pem" ".github/gws-handoff/payload-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/key-${GITHUB_RUN_ID}.b64" ".github/gws-handoff/iv-${GITHUB_RUN_ID}.hex"
+          rmdir .github/gws-handoff 2>/dev/null || true
+          {
+            echo 'version=1.0.15'
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "apk_cert_sha256=${APK_CERT_SHA256:-unavailable}"
+            echo "public_urls_ok=${PUBLIC_URLS_OK:-false}"
+          } > .github/GWS_V115_RELEASE_STATUS.txt
+          if [ "${PUBLIC_URLS_OK:-false}" = 'true' ]; then printf '1.0.15\n' > GWS_VERSION; fi
+          git config user.name 'GWS Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'Record GWS Online v1.0.15 release result [skip ci]' || true
+          git push origin HEAD:main
+
+      - name: Assert release complete
+        run: |
+          test "${APK_CERT_SHA256:-}" = "$EXPECTED_CERT_SHA256"
+          test "${PUBLIC_URLS_OK:-}" = 'true'
