@@ -1319,6 +1319,13 @@ class LiveViewModel(
     /** Internal playback: the canonical ExoPlayer / mpv / Stalker / history side-effects for a
      *  channel. Direct-tune's background rebuild path calls this without [cancelPendingZapRebuild]
      *  so the in-flight rebuild it owns isn't killed by its own play. */
+    private val uhdNameRx = Regex(
+        "(^|[^A-Z0-9])(4K|UHD|2160P?|HEVC|H[.]?265)([^A-Z0-9]|$)",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private fun likelyUhd(channel: ChannelEntity): Boolean = uhdNameRx.containsMatchIn(channel.name)
+
     private suspend fun playChannel(channel: ChannelEntity) {
         val pid = currentProfileId() ?: return
         if (!tv.own.owntv.core.content.AdultCategoryClassifier.allows(pid, channel.categoryId, profileDao, categoryDao)) return
@@ -1349,7 +1356,10 @@ class LiveViewModel(
         // outranks the setting AND a per-channel pin, because handing such a channel to mpv can only
         // produce a failure and a wasted handover.
         val drmProtected = channel.drmConfig != null
-        val onMpv = if (drmProtected) false else pin ?: (refusing || setting.startsOnMpv)
+        // Tagged UHD/4K/HEVC channels go straight to mpv's MediaCodec direct path instead of
+        // spending the first open on ExoPlayer. Explicit pins/EXO_ONLY and DRM still win.
+        val uhdFastPath = pin == null && !drmProtected && setting.allowsHandover && likelyUhd(channel)
+        val onMpv = if (drmProtected) false else pin ?: (uhdFastPath || refusing || setting.startsOnMpv)
         // A pin that contradicts an "only" setting re-opens the handover for this one channel. Without
         // that, the exception channel would be locked to the engine the user just said cannot play it,
         // with the ladder forbidden from ever reaching the one that can — a dead end of our own making.
@@ -1362,6 +1372,7 @@ class LiveViewModel(
         val reason = when {
             drmProtected -> "exoplayer (drm)"
             pin != null -> "${if (onMpv) "mpv" else "exoplayer"} (pinned)"
+            uhdFastPath -> "mpv (UHD fast path)"
             refusing -> "mpv (panel refuses segments)"
             else -> "${if (onMpv) "mpv" else "exoplayer"} (setting)"
         }

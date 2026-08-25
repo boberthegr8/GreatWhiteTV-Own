@@ -228,6 +228,7 @@ fun OwnTVShell(
     var showChannelList by remember { mutableStateOf(false) }
     // In-player watch-history list (Right while controls hidden, live only).
     var showHistoryList by remember { mutableStateOf(false) }
+    var showGuideOverlay by remember { mutableStateOf(false) }
     val zapChannels by liveVm.zapChannels.collectAsStateWithLifecycle()
     val zapListTitle by liveVm.zapListTitle.collectAsStateWithLifecycle()
     val zapListKey by liveVm.zapListKey.collectAsStateWithLifecycle()
@@ -941,11 +942,19 @@ fun OwnTVShell(
                     onAudioMode = toAudioMode,
                     // The channel-list overlay draws ABOVE the HUD; while it's open the HUD goes inert so
                     // its hide/error focus grabs can't yank D-pad focus off the overlay.
-                    inert = showChannelList || showHistoryList || showCategoryBrowser || showSubtitleSearch || showLocalSubPicker,
+                    inert = showChannelList || showHistoryList || showGuideOverlay || showCategoryBrowser || showSubtitleSearch || showLocalSubPicker,
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
                     onOpenChannelList = if (isTunedLive && liveCanZap) { { showChannelList = true } } else null,
                     onOpenHistoryList = if (isTunedLive) { { showHistoryList = true } } else null,
+                    onOpenGuide = if (isTunedLive) {
+                        {
+                            showChannelList = false
+                            showHistoryList = false
+                            liveVm.hideCategoryBrowser()
+                            showGuideOverlay = true
+                        }
+                    } else null,
                     onRewindLive = if (isTunedLive && canRewindLive) liveVm::rewindLive else null,
                     onForwardLive = if (isTunedLive) liveVm::forwardLive else null,
                     onGoToLive = if (isTunedLive) liveVm::goToLive else null,
@@ -1065,6 +1074,40 @@ fun OwnTVShell(
                             onSelect = { liveVm.ensurePlaying(it); showChannelList = false },
                             onDismiss = { showChannelList = false },
                             onOpenCategories = { liveVm.showCategories() },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                // GUIDE — real EPG grid in the same sliding family as categories/channels, while video keeps playing.
+                if (showGuideOverlay && isLiveChannel) {
+                    tv.own.owntv.features.shell.components.GuideDrawerOverlay(
+                        onDismiss = { showGuideOverlay = false },
+                        modifier = Modifier.fillMaxSize(),
+                    ) {
+                        EpgScreen(
+                            onBack = { showGuideOverlay = false },
+                            onFullscreen = {},
+                            onPlayChannel = { ch, _ ->
+                                showGuideOverlay = false
+                                restoreFocus = false
+                                liveVm.watchFromGuide(ch)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                            },
+                            onPlayCatchup = { ch, prog ->
+                                showGuideOverlay = false
+                                restoreFocus = false
+                                liveVm.playCatchupProgramme(ch, prog)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                            },
+                            onAddEpg = {
+                                showGuideOverlay = false
+                                playerMode = PlayerMode.MINI
+                                openEpgAdd = true
+                                onSelectSection(MainSection.SETTINGS)
+                            },
+                            restoreFocus = false,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }

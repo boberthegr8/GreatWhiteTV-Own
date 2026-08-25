@@ -1822,10 +1822,10 @@
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	#EXTM3U
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/live/${s.username}/${s.password}/$streamId.m3u8
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/live/${s.username}/${s.password}/$streamId.ts
-1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/movie/${s.username}/${s.password}/$streamId.${ext ?: "mp4"}
+1	url	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/movie/${s.username}/${s.password}/$streamId.${normalizedStreamExt(ext)}
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/player_api.php?username=$u&password=$p
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/player_api.php?username=$u&password=$p&action=$action$extra
-1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/series/${s.username}/${s.password}/$episodeId.${ext ?: "mp4"}
+1	url	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/series/${s.username}/${s.password}/$episodeId.${normalizedStreamExt(ext)}
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	${base(s)}/xmltv.php?username=$u&password=$p
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	&category_id=$it
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	&series_id=$seriesId
@@ -1837,14 +1837,17 @@
 2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	added
 4	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	category_id
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	category_name
-2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	container_extension
+2	json	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	container_ext
+3	json	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	container_extension
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	cover
 2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	description
+2	json	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	direct_source
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	epg_channel_id
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	epg_listings
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	episode_num
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	episodes
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	exp_date
+2	json	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	extension
 1	log	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	firstLiveStreamId failed for source ${s.id}
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	get_live_categories
 2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	get_live_streams
@@ -1855,9 +1858,10 @@
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	get_vod_categories
 2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	get_vod_streams
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	id
+1	json	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	info
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	last_modified
 1	technical	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	max_connections
-2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	mp4
+1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	mp4
 3	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	name
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	num
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	objects
@@ -1877,6 +1881,7 @@
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	streamArray start label=$label
 2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	stream_icon
 2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	stream_id
+2	json	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	stream_url
 2	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	title
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	totalMs=${SystemClock.elapsedRealtime() - startedAt}
 1	protocol	app/src/main/java/tv/own/owntv/core/parser/XtreamClient.kt	totalMs=${now - startedAt}
@@ -1961,6 +1966,8 @@
 1	technical	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	${season.id}:$epNo
 1	log	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	SeriesRepository
 1	log	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	episodes seriesId=$seriesId fetched=${fetched.size} new=${plan.inserts.size}
+1	url	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	http://
+1	url	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	https://
 1	log	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	stalker episode load failed seriesId=${series.id}
 1	log	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	stalker episodes seriesId=${series.id} remoteId=$remoteId seasons=${seasons.size} episodes=${episodes.size}
 1	log	app/src/main/java/tv/own/owntv/core/repository/SeriesRepository.kt	updated=${plan.updates.size} removed=${plan.deleteIds.size}
@@ -2891,6 +2898,7 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' stopped playing (state=$left) — ${EXO_STALL_HANDOFF_MS / 1000}s to recover
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}' — no fallback left ($reason)
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	'${channel.name}': $detail
+1	regex	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	(^|[^A-Z0-9])(4K|UHD|2160P?|HEVC|H[.]?265)([^A-Z0-9]|$)
 2	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	ALL
 2	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	CATCHUP
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	ExoPlayer
@@ -2912,6 +2920,7 @@
 3	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	exoplayer
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	exoplayer (drm)
 4	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv
+1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv (UHD fast path)
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv (panel refuses segments)
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv couldn't play it: ${failure.second}
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	mpv never opened it (${MPV_OPEN_TIMEOUT_MS / 1000}s, no picture and no error)

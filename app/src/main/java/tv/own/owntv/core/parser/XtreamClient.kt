@@ -31,6 +31,7 @@ data class XtSeries(
 )
 data class XtEpisode(
     val id: String, val seasonNumber: Int, val episodeNumber: Int, val title: String, val containerExt: String?,
+    val directSource: String? = null,
 )
 data class XtSeriesInfo(val episodes: List<XtEpisode>)
 
@@ -259,22 +260,43 @@ class XtreamClient(private val http: HttpClient) {
         var epNum = 0
         var title = ""
         var ext: String? = null
+        var directSource: String? = null
         var season = seasonFallback
+
+        fun readInfoObject() {
+            if (reader.peek() != JsonToken.BEGIN_OBJECT) { reader.skipValue(); return }
+            reader.beginObject()
+            while (reader.hasNext()) {
+                when (reader.nextName()) {
+                    "container_extension", "container_ext", "extension" ->
+                        reader.nextStringOrNull()?.trim()?.trimStart('.')?.takeIf { it.isNotBlank() }?.let { ext = it }
+                    "direct_source", "stream_url" ->
+                        reader.nextStringOrNull()?.trim()?.takeIf { it.isNotBlank() }?.let { directSource = it }
+                    else -> reader.skipValue()
+                }
+            }
+            reader.endObject()
+        }
+
         reader.beginObject()
         while (reader.hasNext()) {
             when (reader.nextName()) {
                 "id" -> id = reader.nextStringOrNull()
                 "episode_num" -> epNum = reader.nextIntOrNull() ?: epNum
                 "title" -> title = reader.nextStringOrNull() ?: title
-                "container_extension" -> ext = reader.nextStringOrNull()
+                "container_extension", "container_ext", "extension" ->
+                    ext = reader.nextStringOrNull()?.trim()?.trimStart('.')?.takeIf { it.isNotBlank() }
+                "direct_source", "stream_url" ->
+                    directSource = reader.nextStringOrNull()?.trim()?.takeIf { it.isNotBlank() }
                 "season" -> reader.nextIntOrNull()?.let { if (it > 0) season = it }
+                "info" -> readInfoObject()
                 else -> reader.skipValue()
             }
         }
         reader.endObject()
         // Keep a missing provider title empty. The Compose episode renderer supplies a localized
         // episode-number fallback; storing English here would freeze the device language in the DB.
-        id?.let { out.add(XtEpisode(it, season, epNum, title.trim(), ext)) }
+        id?.let { out.add(XtEpisode(it, season, epNum, title.trim(), ext, directSource)) }
     }
 
     /** Reads a string, coercing numbers and tolerating JSON null. */
@@ -375,10 +397,13 @@ class XtreamClient(private val http: HttpClient) {
         val fmt = java.text.SimpleDateFormat("yyyy-MM-dd:HH-mm", java.util.Locale.US).apply { timeZone = tz }
         return "${base(s)}/timeshift/${s.username}/${s.password}/$durationMinutes/${fmt.format(java.util.Date(startMs))}/$streamId.$ext"
     }
+    private fun normalizedStreamExt(ext: String?): String =
+        ext?.trim()?.trimStart('.')?.takeIf { it.isNotBlank() } ?: "mp4"
+
     fun movieUrl(s: SourceEntity, streamId: String, ext: String?) =
-        "${base(s)}/movie/${s.username}/${s.password}/$streamId.${ext ?: "mp4"}"
+        "${base(s)}/movie/${s.username}/${s.password}/$streamId.${normalizedStreamExt(ext)}"
     fun seriesEpisodeUrl(s: SourceEntity, episodeId: String, ext: String?) =
-        "${base(s)}/series/${s.username}/${s.password}/$episodeId.${ext ?: "mp4"}"
+        "${base(s)}/series/${s.username}/${s.password}/$episodeId.${normalizedStreamExt(ext)}"
 
     /** Full XMLTV guide for the whole account (all channels) — the bulk EPG used by the guide grid. */
     data class XtAccountDetails(
