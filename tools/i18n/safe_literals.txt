@@ -2873,6 +2873,13 @@
 1	log	app/src/main/java/tv/own/owntv/features/live/LiveEpgReader.kt	queryMs=${fetchedAt - startedAt} rankMs=${done - fetchedAt} totalMs=${done - startedAt}
 1	protocol	app/src/main/java/tv/own/owntv/features/live/LiveEpgReader.kt	ts
 1	empty	app/src/main/java/tv/own/owntv/features/live/LiveQueries.kt	\0
+1	empty	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	\0
+1	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	${it}p
+2	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	+
+2	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	30
+1	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	EEE
+1	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	channel
+2	technical	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	−
 3	empty	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	\0
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	#$it
 1	technical	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	$label — $reason
