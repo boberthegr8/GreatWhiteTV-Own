@@ -1,20 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Cold-start splash icon (audit ST3): the OwnTV cyan play-mark, deliberately NOT the wordmark.
-  Drawn on the 288dp splash canvas with the mark kept inside the 192dp inner circle the platform
-  masks to, so it renders identically on the API 31+ system splash and the compat splash.
--->
+<!-- GWS Online cold-start mark. Kept inside the Android 12+ splash safe area. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="288dp"
     android:height="288dp"
     android:viewportWidth="288"
     android:viewportHeight="288">
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#22D3EE"
-        android:strokeWidth="12.5"
-        android:pathData="M106.5,69 L181.5,69 A37.5,37.5 0 0 1 219,106.5 L219,181.5 A37.5,37.5 0 0 1 181.5,219 L106.5,219 A37.5,37.5 0 0 1 69,181.5 L69,106.5 A37.5,37.5 0 0 1 106.5,69 Z" />
+        android:fillColor="#07111C"
+        android:pathData="M72,66 L216,66 A30,30 0 0 1 246,96 L246,192 A30,30 0 0 1 216,222 L72,222 A30,30 0 0 1 42,192 L42,96 A30,30 0 0 1 72,66 Z" />
     <path
         android:fillColor="#22D3EE"
-        android:pathData="M122,113 L188,144 L122,175 Z" />
+        android:pathData="M72,66 L216,66 A30,30 0 0 1 246,96 L246,192 A30,30 0 0 1 216,222 L72,222 A30,30 0 0 1 42,192 L42,96 A30,30 0 0 1 72,66 Z M72,76 A20,20 0 0 0 52,96 L52,192 A20,20 0 0 0 72,212 L216,212 A20,20 0 0 0 236,192 L236,96 A20,20 0 0 0 216,76 Z" />
+    <!-- G -->
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M78,117 C64,117 56,128 56,144 C56,160 65,171 80,171 C89,171 96,168 102,163 L102,142 L79,142 L79,151 L92,151 L92,159 C89,161 85,162 81,162 C72,162 67,155 67,144 C67,133 72,126 79,126 C85,126 89,129 92,134 L101,129 C97,121 90,117 78,117 Z" />
+    <!-- W -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M109,119 L121,169 L133,169 L144,137 L155,169 L167,169 L179,119 L167,119 L160,154 L150,119 L139,119 L128,154 L121,119 Z" />
+    <!-- S -->
+    <path
+        android:fillColor="#22D3EE"
+        android:pathData="M208,117 C193,117 184,124 184,135 C184,146 192,150 204,153 C212,155 215,157 215,161 C215,165 211,168 205,168 C197,168 191,165 186,160 L179,168 C186,175 194,178 205,178 C220,178 227,170 227,160 C227,149 219,145 207,142 C199,140 196,138 196,134 C196,130 200,127 206,127 C213,127 218,129 223,133 L229,124 C223,120 216,117 208,117 Z" />
 </vector>
