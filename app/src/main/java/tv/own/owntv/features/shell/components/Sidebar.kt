@@ -1,6 +1,7 @@
 package tv.own.owntv.features.shell.components
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
@@ -34,6 +35,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,7 +50,6 @@ import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.NavAccentBar
 import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVAvatar
-import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.RailPanelFill
 import tv.own.owntv.ui.components.rememberNavLadderColors
 import tv.own.owntv.ui.components.roundedPanel
@@ -174,21 +175,11 @@ fun Sidebar(
 
 @Composable
 private fun AppLogo(modifier: Modifier = Modifier) {
-    val colors = OwnTVTheme.colors
-    Box(
-        modifier = modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .border(width = 2.dp, color = colors.primary, shape = RoundedCornerShape(20.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        OwnTVIcon(
-            icon = OwnTVIcon.PLAY,
-            tint = colors.primary,
-            modifier = Modifier.size(26.dp),
-            filled = true,
-        )
-    }
+    Image(
+        painter = painterResource(R.drawable.ic_splash_mark),
+        contentDescription = stringResource(R.string.gws_app_name),
+        modifier = modifier.size(58.dp),
+    )
 }
 
 @Composable

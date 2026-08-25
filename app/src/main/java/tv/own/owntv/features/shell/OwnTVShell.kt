@@ -243,6 +243,21 @@ fun OwnTVShell(
     val showCategoryBrowser by liveVm.showCategoryBrowser.collectAsStateWithLifecycle()
     val browserCategories by liveVm.browserCategories.collectAsStateWithLifecycle()
     val previewChannel by liveVm.previewChannel.collectAsStateWithLifecycle()
+
+    LaunchedEffect(selectedSection, playerMode, zapSource, previewChannel?.id) {
+        if (selectedSection == MainSection.LIVE_TV &&
+            playerMode == PlayerMode.MINI &&
+            zapSource == MainSection.LIVE_TV &&
+            previewChannel != null
+        ) {
+            showChannelList = false
+            showHistoryList = false
+            liveVm.hideCategoryBrowser()
+            playerMode = PlayerMode.FULLSCREEN
+            showGuideOverlay = true
+        }
+    }
+
     // Favorite state for the player HUD's in-stream favorite toggle (live channel / movie / series).
     val liveFavoriteIds by liveVm.favoriteIds.collectAsStateWithLifecycle()
     val playingMovie by movieVm.playingMovie.collectAsStateWithLifecycle()
@@ -629,7 +644,7 @@ fun OwnTVShell(
                             onPlayMovie = { id, pos -> scope.launch { if (movieVm.playByIdAsync(id, pos) && !movieVm.externalPlayerOn.value) openFullscreen(MainSection.MOVIES) } },
                             onPlayEpisode = { seriesId, epId, pos -> scope.launch { if (seriesVm.playFromHomeAsync(seriesId, epId, pos) && !seriesVm.externalPlayerOn.value) openFullscreen(MainSection.SERIES) } },
                             onPlayChannel = { id, zap -> scope.launch { if (liveVm.ensurePlayingByIdAsync(id, zap)) openFullscreen(MainSection.LIVE_TV) } },
-                            onOpenGuide = { onSelectSection(MainSection.EPG) },
+                            onOpenGuide = { onSelectSection(MainSection.LIVE_TV) },
                             onActivateTrending = { selected, onUnavailable ->
                                 scope.launch {
                                     when (val current = homeVm.revalidateTrendingItem(selected)) {
@@ -697,14 +712,31 @@ fun OwnTVShell(
                             modifier = Modifier.fillMaxSize(),
                         )
 
-                        selectedSection == MainSection.LIVE_TV -> LiveScreen(
+                        selectedSection == MainSection.LIVE_TV -> EpgScreen(
+                            onBack = { runCatching { sidebarFocus.requestFocus() } },
                             onFullscreen = { openFullscreen() },
-                            onChildFocused = { focusedLayer = ShellLayer.CONTENT },
-                            previewEnabled = playerMode == PlayerMode.NONE,
+                            onPlayChannel = { ch, _ ->
+                                restoreFocus = false
+                                liveVm.watchFromGuide(ch)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                                if (playerMode != PlayerMode.MINI && !liveVm.externalPlayerOn.value) playerMode = PlayerMode.FULLSCREEN
+                            },
+                            onPlayCatchup = { ch, prog ->
+                                restoreFocus = false
+                                liveVm.playCatchupProgramme(ch, prog)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                                if (playerMode != PlayerMode.MINI) playerMode = PlayerMode.FULLSCREEN
+                            },
+                            onAddEpg = { openEpgAdd = true; onSelectSection(MainSection.SETTINGS) },
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onContentScrolled = { contentScrolled = it },
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onFocusChanged { if (it.hasFocus) focusedLayer = ShellLayer.CONTENT }
+                                .focusGroup(),
                         )
 
                         selectedSection == MainSection.MOVIES -> MoviesScreen(

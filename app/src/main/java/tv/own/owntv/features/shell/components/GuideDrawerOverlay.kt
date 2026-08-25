@@ -21,14 +21,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import tv.own.owntv.core.i18n.HorizontalDirection
+import tv.own.owntv.core.i18n.horizontalDirection
 
 /**
- * Near-full-screen Guide drawer used while Live TV remains playing behind the shell.
- * The full Guide destination still exists for normal navigation; this wrapper is specifically
- * the appliance-style in-player layer, leaving a strip of video visible on the trailing edge.
+ * Near-full-screen Live TV EPG drawer used while the current channel keeps playing behind it.
+ * Live TV owns the EPG; this drawer is the appliance-style collapsible in-player layer, leaving
+ * a strip of video visible on the trailing edge.
  */
 @Composable
 fun GuideDrawerOverlay(
@@ -42,7 +48,7 @@ fun GuideDrawerOverlay(
     BackHandler { onDismiss() }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val panelWidth = maxWidth * 0.80f
+        val panelWidth = maxWidth * 0.88f
         val hiddenOffset = if (layoutDirection == LayoutDirection.Ltr) -panelWidth else panelWidth
         val slideOffset by animateDpAsState(
             targetValue = if (revealed) 0.dp else hiddenOffset,
@@ -57,6 +63,16 @@ fun GuideDrawerOverlay(
                 .offset(x = slideOffset)
                 .fillMaxHeight()
                 .width(panelWidth)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown &&
+                        event.key.horizontalDirection(layoutDirection) == HorizontalDirection.START
+                    ) {
+                        onDismiss()
+                        true
+                    } else {
+                        false
+                    }
+                }
                 .clip(RoundedCornerShape(0.dp, 22.dp, 22.dp, 0.dp))
                 .background(Color(0xF207111C)),
         ) {

@@ -58,7 +58,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
 
     companion object {
         /** Fixed order of the browse icons in the rail (Settings is pinned separately at the bottom). */
-        val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, ONLINE, DOWNLOADS, EPG)
+        val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, ONLINE, DOWNLOADS)
 
         /** All six browse items — the default `visibleSections` value so the rail shows everything until
          *  the first real emission lands (avoids a cold-start flicker to an empty rail). */
@@ -66,7 +66,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
 
         /**
          * DYNAMIC-mode rule (v4.3.0): which browse icons show given the active playlist's content caps.
-         * Home always; Live & Guide when there are channels; Movies/Series when their tables have rows;
+         * Home always; Live TV (EPG view) when there are channels; Movies/Series when their tables have rows;
          * Downloads when Movies OR Series exist (Live has no download). Settings is always pinned and not
          * part of this set. Shared between ShellViewModel (the rail) and SettingsViewModel (the settings
          * screen's read-only DYNAMIC rows) so both agree on what DYNAMIC mode shows.
@@ -74,7 +74,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
         fun dynamicVisible(hasLive: Boolean, hasMovies: Boolean, hasSeries: Boolean): Set<MainSection> = buildSet {
             add(HOME)
             add(ONLINE)
-            if (hasLive) { add(LIVE_TV); add(EPG) }
+            if (hasLive) add(LIVE_TV)
             if (hasMovies) add(MOVIES)
             if (hasSeries) add(SERIES)
             if (hasMovies || hasSeries) add(DOWNLOADS)
