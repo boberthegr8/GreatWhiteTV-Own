@@ -3,56 +3,54 @@ package tv.own.owntv.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Material 3 tonal palette for OwnTV (teal-seeded). NEUTRAL + secondary/tertiary roles are
- * theme-only; the `primary` roles are seeded per [AccentColor] (default teal == these values).
- *
- * Dark uses a near-black background (#040e0b) so the panel colours (Phase 6) pop against
- * the deep dark surface while keeping a subtle green undertone.
+ * Material 3 tonal palette for GWS Online. The default keeps the GWS cyan mark against a cool
+ * near-black/navy TV surface so focus, posters and channel logos read cleanly from a distance.
+ * Accent presets can still replace the primary roles; these values own the neutral shell.
  */
 
-// Brand mark color (the OwnTV play logo) — constant.
-val AccentCyan = Color(0xFF52DBC8)
+// GWS brand cyan — shared with the launcher, banner and startup mark.
+val AccentCyan = Color(0xFF22D3EE)
 
-// ---------------- DARK (M3 dark over near-black #040e0b) ----------------
-val DarkBackground = Color(0xFF040E0B) // Option A — nav + inter-panel gap surface
-val DarkSurface = Color(0xFF0E1513)
-val DarkSurfaceContainerLowest = Color(0xFF090F0E)
-val DarkSurfaceContainerLow = Color(0xFF161D1B)
-val DarkSurfaceContainer = Color(0xFF1B211F)
-val DarkSurfaceContainerHigh = Color(0xFF252B29)
-val DarkSurfaceContainerHighest = Color(0xFF303634)
-val DarkOnSurface = Color(0xFFDEE4E1)
-val DarkOnSurfaceVariant = Color(0xFFBFC9C4)
-val DarkOutline = Color(0xFF89938F)
-val DarkOutlineVariant = Color(0xFF3F4945)
-val DarkSecondary = Color(0xFFB1CCC3)
-val DarkOnSecondary = Color(0xFF1C352E)
-val DarkSecondaryContainer = Color(0xFF334B44)
-val DarkOnSecondaryContainer = Color(0xFFCDE8DF)
-val DarkTertiary = Color(0xFFA9CBE4)
-val DarkOnTertiary = Color(0xFF0B3445)
-val DarkTertiaryContainer = Color(0xFF294B5D)
-val DarkOnTertiaryContainer = Color(0xFFC5E7FF)
+// ---------------- DARK (cool navy/graphite) ----------------
+val DarkBackground = Color(0xFF050B12)
+val DarkSurface = Color(0xFF0B121B)
+val DarkSurfaceContainerLowest = Color(0xFF07101A)
+val DarkSurfaceContainerLow = Color(0xFF101A25)
+val DarkSurfaceContainer = Color(0xFF16212D)
+val DarkSurfaceContainerHigh = Color(0xFF202E3B)
+val DarkSurfaceContainerHighest = Color(0xFF2B3B49)
+val DarkOnSurface = Color(0xFFE6EDF4)
+val DarkOnSurfaceVariant = Color(0xFFBAC7D4)
+val DarkOutline = Color(0xFF8293A3)
+val DarkOutlineVariant = Color(0xFF394957)
+val DarkSecondary = Color(0xFFAFC9D5)
+val DarkOnSecondary = Color(0xFF17323D)
+val DarkSecondaryContainer = Color(0xFF294651)
+val DarkOnSecondaryContainer = Color(0xFFCAE8F4)
+val DarkTertiary = Color(0xFFA9C7F4)
+val DarkOnTertiary = Color(0xFF183153)
+val DarkTertiaryContainer = Color(0xFF31496B)
+val DarkOnTertiaryContainer = Color(0xFFD6E3FF)
 val DarkError = Color(0xFFFFB4AB)
 
-// ---------------- LIGHT (M3 light) ----------------
-val LightBackground = Color(0xFFF5FBF8)
-val LightSurface = Color(0xFFF5FBF8)
+// ---------------- LIGHT ----------------
+val LightBackground = Color(0xFFF5FAFD)
+val LightSurface = Color(0xFFF5FAFD)
 val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
-val LightSurfaceContainerLow = Color(0xFFEFF5F2)
-val LightSurfaceContainer = Color(0xFFE9EFEC)
-val LightSurfaceContainerHigh = Color(0xFFE3EAE6)
-val LightSurfaceContainerHighest = Color(0xFFDEE4E1)
-val LightOnSurface = Color(0xFF171D1B)
-val LightOnSurfaceVariant = Color(0xFF3F4945)
-val LightOutline = Color(0xFF6F7975)
-val LightOutlineVariant = Color(0xFFBFC9C4)
-val LightSecondary = Color(0xFF4B635C)
+val LightSurfaceContainerLow = Color(0xFFEDF4F8)
+val LightSurfaceContainer = Color(0xFFE6EEF3)
+val LightSurfaceContainerHigh = Color(0xFFDDE7ED)
+val LightSurfaceContainerHighest = Color(0xFFD4E0E7)
+val LightOnSurface = Color(0xFF172027)
+val LightOnSurfaceVariant = Color(0xFF40515D)
+val LightOutline = Color(0xFF70818D)
+val LightOutlineVariant = Color(0xFFBECBD3)
+val LightSecondary = Color(0xFF47626E)
 val LightOnSecondary = Color(0xFFFFFFFF)
-val LightSecondaryContainer = Color(0xFFCDE8DF)
-val LightOnSecondaryContainer = Color(0xFF07201A)
-val LightTertiary = Color(0xFF416278)
+val LightSecondaryContainer = Color(0xFFCBE8F2)
+val LightOnSecondaryContainer = Color(0xFF08202A)
+val LightTertiary = Color(0xFF45618B)
 val LightOnTertiary = Color(0xFFFFFFFF)
-val LightTertiaryContainer = Color(0xFFC5E7FF)
-val LightOnTertiaryContainer = Color(0xFF001E2F)
+val LightTertiaryContainer = Color(0xFFD6E3FF)
+val LightOnTertiaryContainer = Color(0xFF001B3E)
 val LightError = Color(0xFFBA1A1A)
