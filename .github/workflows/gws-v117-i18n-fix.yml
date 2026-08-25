@@ -1,0 +1,45 @@
+name: GWS v1.0.17 i18n inventory fix
+
+on:
+  push:
+    branches:
+      - gws-v1.0.17-live-tv-speed
+
+permissions:
+  contents: write
+
+jobs:
+  classify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gws-v1.0.17-live-tv-speed
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Refresh LiveScreen technical literal inventory
+        run: |
+          set -euo pipefail
+          python tools/i18n/check_hardcoded_strings.py prune-safe || true
+          python tools/i18n/check_hardcoded_strings.py classify-safe --path app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt --text '' --category empty
+          python tools/i18n/check_hardcoded_strings.py classify-safe --path app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt --text '${it}p' --category technical
+          python tools/i18n/check_hardcoded_strings.py classify-safe --path app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt --text '+' --category technical
+          python tools/i18n/check_hardcoded_strings.py classify-safe --path app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt --text '30' --category technical
+          python tools/i18n/check_hardcoded_strings.py classify-safe --path app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt --text 'EEE' --category technical
+          python tools/i18n/check_hardcoded_strings.py classify-safe --path app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt --text 'channel' --category technical
+          python tools/i18n/check_hardcoded_strings.py classify-safe --path app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt --text '−' --category technical
+          python tools/i18n/check_hardcoded_strings.py verify --bootstrap
+      - name: Commit inventory
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- tools/i18n/safe_literals.txt tools/i18n/baseline.txt; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/i18n/safe_literals.txt tools/i18n/baseline.txt
+          git commit -m 'Classify GWS v1.0.17 Live TV technical literals [skip ci]'
+          git push origin HEAD:gws-v1.0.17-live-tv-speed
