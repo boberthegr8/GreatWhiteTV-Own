@@ -119,6 +119,30 @@ if n != 1:
 # Every UI action that used to open the separate Guide destination now opens Live TV, whose view is EPG.
 shell = shell.replace("onSelectSection(MainSection.EPG)", "onSelectSection(MainSection.LIVE_TV)")
 
+# If a live channel is already docked in the mini-player, selecting Live TV must not leave a tiny PiP
+# beside a normal full-page guide. Promote the existing live stream back to full-screen and put the
+# EPG on top as the same sliding drawer used from the player GUIDE action.
+mini_anchor = '''    val previewChannel by liveVm.previewChannel.collectAsStateWithLifecycle()
+    // Favorite state for the player HUD's in-stream favorite toggle (live channel / movie / series).'''
+mini_replacement = '''    val previewChannel by liveVm.previewChannel.collectAsStateWithLifecycle()
+
+    LaunchedEffect(selectedSection, playerMode, zapSource, previewChannel?.id) {
+        if (selectedSection == MainSection.LIVE_TV &&
+            playerMode == PlayerMode.MINI &&
+            zapSource == MainSection.LIVE_TV &&
+            previewChannel != null
+        ) {
+            showChannelList = false
+            showHistoryList = false
+            liveVm.hideCategoryBrowser()
+            playerMode = PlayerMode.FULLSCREEN
+            showGuideOverlay = true
+        }
+    }
+
+    // Favorite state for the player HUD's in-stream favorite toggle (live channel / movie / series).'''
+shell = replace_once(shell, mini_anchor, mini_replacement, "Mini live -> EPG drawer promotion")
+
 shell_path.write_text(shell)
 
 
