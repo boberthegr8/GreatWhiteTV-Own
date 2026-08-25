@@ -242,6 +242,7 @@
 1	app/src/main/java/tv/own/owntv/features/customize/MoveToCategoryDialog.kt	☐
 1	app/src/main/java/tv/own/owntv/features/customize/MoveToCategoryDialog.kt	☑
 1	app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt	ALL
+1	app/src/main/java/tv/own/owntv/features/live/LiveScreen.kt	UNUSED_VARIABLE
 2	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	CUSTOM:
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	CUSTOM:$id
 1	app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt	ExoPlayer error before first frame: ${info?.raw ?: previewEngine.error.value}
