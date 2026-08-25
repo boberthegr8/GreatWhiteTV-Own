@@ -5,12 +5,8 @@ import androidx.compose.ui.graphics.Color
 import tv.own.owntv.R
 
 /**
- * Material You-style accent presets. OwnTV can't rely on true wallpaper-based dynamic color (a phone
- * feature that isn't dependable on Android TV), so instead the user picks an accent and the M3 color
- * scheme is seeded from it. Each preset carries its tonal `primary` / `primaryContainer` roles for
- * both dark and light themes (M3 uses lighter tones on dark surfaces, darker tones on light).
- *
- * Neutrals (background, surface containers, text, outline) are theme-only and live in [OwnTVColors].
+ * Material You-style accent presets. Android TV cannot depend on wallpaper-derived dynamic color,
+ * so these presets seed the primary roles while the GWS shell keeps its own neutral TV palette.
  */
 enum class AccentColor(
     @param:StringRes val labelRes: Int,
@@ -25,10 +21,10 @@ enum class AccentColor(
 ) {
     TEAL(
         R.string.settings_accent_teal,
-        primaryDark = Color(0xFF52DBC8), onPrimaryDark = Color(0xFF003730),
-        primaryContainerDark = Color(0xFF004F46), onPrimaryContainerDark = Color(0xFF6FF8E4),
-        primaryLight = Color(0xFF006B5E), onPrimaryLight = Color(0xFFFFFFFF),
-        primaryContainerLight = Color(0xFF6FF8E4), onPrimaryContainerLight = Color(0xFF00201B),
+        primaryDark = Color(0xFF22D3EE), onPrimaryDark = Color(0xFF003640),
+        primaryContainerDark = Color(0xFF004E5B), onPrimaryContainerDark = Color(0xFFA5F3FC),
+        primaryLight = Color(0xFF007C91), onPrimaryLight = Color(0xFFFFFFFF),
+        primaryContainerLight = Color(0xFFA5F3FC), onPrimaryContainerLight = Color(0xFF001F26),
     ),
     BLUE(
         R.string.settings_accent_blue,
@@ -49,7 +45,8 @@ enum class AccentColor(
         primaryDark = Color(0xFF6FDB94), onPrimaryDark = Color(0xFF00391C),
         primaryContainerDark = Color(0xFF1F5135), onPrimaryContainerDark = Color(0xFF8BF8AF),
         primaryLight = Color(0xFF1B6B3F), onPrimaryLight = Color(0xFFFFFFFF),
-        primaryContainerLight = Color(0xFFA6F2C0), onPrimaryContainerLight = Color(0xFF00210F),
+        primaryContainerLight = Color(0xFFA6F2C0), onPrimaryLight = Color(0xFFFFFFFF),
+        onPrimaryContainerLight = Color(0xFF00210F),
     ),
     AMBER(
         R.string.settings_accent_amber,
