@@ -1,0 +1,74 @@
+name: GWS v1.0.18 Live TV EPG hotfix
+
+on:
+  push:
+    branches:
+      - gws-v118-live-epg-fix
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gws-v118-live-epg-hotfix
+  cancel-in-progress: true
+
+jobs:
+  patch-test:
+    if: ${{ !contains(github.event.head_commit.message, '[v118-patched]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: gws-v118-live-epg-fix
+          fetch-depth: 0
+
+      - name: Apply exact v1.0.18 patch
+        run: python3 tools/gws_v118_live_epg_patch.py
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+
+      - name: Lint
+        run: ./gradlew lintDebug --no-daemon --stacktrace
+
+      - name: Release compile gate
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Verify v1.0.18 intent in source
+        run: |
+          set -euo pipefail
+          test "$(tr -d '\r\n ' < GWS_VERSION)" = "1.0.18"
+          ! grep -q 'val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, ONLINE, DOWNLOADS, EPG)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt
+          grep -q 'selectedSection == MainSection.LIVE_TV -> EpgScreen(' app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt
+          ! grep -q 'selectedSection == MainSection.LIVE_TV -> LiveScreen(' app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt
+          grep -q 'painterResource(R.drawable.ic_splash_mark)' app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt
+          ! grep -A20 'private fun AppLogo' app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt | grep -q 'OwnTVIcon.PLAY'
+          grep -q 'HorizontalDirection.START' app/src/main/java/tv/own/owntv/features/shell/components/GuideDrawerOverlay.kt
+
+      - name: Commit tested hotfix
+        run: |
+          set -euo pipefail
+          git config user.name "GWS v1.0.18 Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add GWS_VERSION \
+            app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt \
+            app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt \
+            app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt \
+            app/src/main/java/tv/own/owntv/features/shell/components/GuideDrawerOverlay.kt
+          git diff --cached --quiet && { echo 'No source changes staged'; exit 1; }
+          git commit -m "GWS v1.0.18: Live TV is EPG and fix GWS app mark [v118-patched]"
+          git push origin HEAD:gws-v118-live-epg-fix
