@@ -1,6 +1,8 @@
 package tv.own.owntv.features.shell.components
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -17,40 +20,43 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import kotlinx.coroutines.delay
 import tv.own.owntv.R
+import tv.own.owntv.core.database.entity.CategoryEntity
 import tv.own.owntv.core.i18n.HorizontalDirection
 import tv.own.owntv.core.i18n.horizontalDirection
-import tv.own.owntv.core.database.entity.CategoryEntity
-import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.ContentPanelFill
+import tv.own.owntv.ui.components.FocusableSurface
+import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.modalScrim
 import tv.own.owntv.ui.components.roundedPanel
-import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.theme.GlassSurface
 import tv.own.owntv.ui.theme.OwnTVTheme
 
 /**
- * Category browser that slides in over the playing video when the user presses Left a second time
- * inside the in-player channel list. Shows every Live TV category/group (with customizations applied:
- * hidden categories excluded, renames shown, manual order respected). OK loads that category's
- * channels into the channel-list overlay; Back or Left returns to the channel list without changing
- * anything. The playing channel's own category is highlighted and focused first.
+ * Category browser drawn over the playing video. It is the first layer of the GWS Live TV drawer:
+ * choosing a category replaces this drawer with that category's channel list while playback remains
+ * full-screen behind it. Back or pushing outward returns to the channel list without changing channel.
  */
 @Composable
 fun CategoryBrowserOverlay(
@@ -68,8 +74,21 @@ fun CategoryBrowserOverlay(
     val listState = rememberLazyListState()
     val focusCurrent = remember { FocusRequester() }
 
+    // Give the drawer a real TV-style entrance instead of abruptly popping over the video.
+    val panelWidth = 380.dp
+    var revealed by remember { mutableStateOf(false) }
+    val hiddenOffset = if (layoutDirection == LayoutDirection.Ltr) -panelWidth else panelWidth
+    val slideOffset by animateDpAsState(
+        targetValue = if (revealed) 0.dp else hiddenOffset,
+        animationSpec = tween(durationMillis = 190),
+        label = "gwsCategoryDrawerOffset",
+    )
+
     LaunchedEffect(Unit) {
+        revealed = true
         runCatching { listState.scrollToItem(currentIndex) }
+        // Let the drawer start moving before handing D-pad focus to its selected row.
+        delay(45)
         runCatching { focusCurrent.requestFocus() }
     }
 
@@ -79,16 +98,20 @@ fun CategoryBrowserOverlay(
         Column(
             modifier = Modifier
                 .align(Alignment.CenterStart)
+                .offset(x = slideOffset)
                 .fillMaxHeight()
-                .width(380.dp)
+                .width(panelWidth)
                 .roundedPanel(radius = 22.dp, fillColor = ContentPanelFill, surface = GlassSurface.DIALOGS)
                 .onPreviewKeyEvent { e ->
-                    // Pushing outward from logical Start returns to the channel list.
+                    // Pushing outward from logical Start returns to the channel drawer.
                     if (e.type == KeyEventType.KeyDown &&
                         e.key.horizontalDirection(layoutDirection) == HorizontalDirection.START
                     ) {
-                        onDismiss(); true
-                    } else false
+                        onDismiss()
+                        true
+                    } else {
+                        false
+                    }
                 }
                 .padding(vertical = 18.dp),
         ) {
@@ -102,7 +125,8 @@ fun CategoryBrowserOverlay(
                 state = listState,
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 12.dp, vertical = 6.dp,
+                    horizontal = 12.dp,
+                    vertical = 6.dp,
                 ),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
