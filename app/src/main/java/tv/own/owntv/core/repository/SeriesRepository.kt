@@ -48,7 +48,11 @@ class SeriesRepository(
         // Read the stamp from the database rather than the passed-in entity: callers hold list rows
         // that may have been loaded before a sync invalidated the cache.
         val syncedAt = seriesDao.getSeriesById(series.id)?.episodesSyncedAt ?: series.episodesSyncedAt
-        if (!shouldRefreshEpisodes(cachedCount, syncedAt, System.currentTimeMillis())) return@withContext true
+        val needsV117XtreamRepair = source.type == SourceType.XTREAM && hasCache &&
+            syncedAt in 1 until V117_SERIES_REPAIR_EPOCH_MS
+        if (!needsV117XtreamRepair &&
+            !shouldRefreshEpisodes(cachedCount, syncedAt, System.currentTimeMillis())
+        ) return@withContext true
 
         val remoteId = series.remoteId
         if (remoteId.isNullOrBlank()) return@withContext hasCache
@@ -93,7 +97,8 @@ class SeriesRepository(
                 seasonNumber = e.seasonNumber,
                 episodeNumber = e.episodeNumber,
                 name = e.title,
-                streamUrl = xtream.seriesEpisodeUrl(source, e.id, e.containerExt),
+                streamUrl = e.directSource?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+                    ?: xtream.seriesEpisodeUrl(source, e.id, e.containerExt),
                 containerExt = e.containerExt,
                 remoteId = e.id,
             )
@@ -161,6 +166,9 @@ class SeriesRepository(
 
     private companion object {
         const val TAG = "SeriesRepository"
+
+        // 2026-08-25 05:30 UTC. Older Xtream episode caches get rebuilt once after v1.0.17.
+        const val V117_SERIES_REPAIR_EPOCH_MS = 1_787_635_800_000L
 
         /** Safety cap on season paging (a show never has hundreds of season pages). */
         const val MAX_SEASON_PAGES = 20

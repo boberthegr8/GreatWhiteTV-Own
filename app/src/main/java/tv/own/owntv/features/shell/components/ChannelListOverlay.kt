@@ -105,7 +105,7 @@ fun ChannelListOverlay(
     }
     BackHandler { onDismiss() }
 
-    Box(modifier = modifier.fillMaxSize().modalScrim(strength = 0.58f)) {
+    Box(modifier = modifier.fillMaxSize().modalScrim(strength = 0.34f)) {
         Column(
             modifier = Modifier
                 .align(if (alignEnd) Alignment.CenterEnd else Alignment.CenterStart)
@@ -180,15 +180,15 @@ private fun ChannelRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .size(48.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
                     .background(colors.surfaceContainerLowest),
                 contentAlignment = Alignment.Center,
             ) {
                 if (!channel.displayLogoUrl.isNullOrBlank()) {
                     AsyncImage(model = channel.displayLogoUrl, contentDescription = null, modifier = Modifier.fillMaxSize())
                 } else {
-                    OwnTVIcon(OwnTVIcon.LIVE_TV, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                    OwnTVIcon(OwnTVIcon.LIVE_TV, tint = colors.onSurfaceVariant, modifier = Modifier.size(22.dp))
                 }
             }
             if (showNumber) {
@@ -200,7 +200,7 @@ private fun ChannelRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     channel.name,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     color = when {
                         isCurrent -> colors.primary
                         focused -> colors.onSurface

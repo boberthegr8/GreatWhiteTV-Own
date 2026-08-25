@@ -135,6 +135,8 @@ fun PlayerHud(
     // Live: open the watch-history list (Right while the controls are hidden) — jump straight back to a
     // recent channel without leaving full-screen. Null = not a live channel.
     onOpenHistoryList: (() -> Unit)? = null,
+    // Live: physical GUIDE key opens the sliding EPG over the playing channel.
+    onOpenGuide: (() -> Unit)? = null,
     // Live rewind / timeshift (catch-up channels). onRewindLive non-null = this live channel can rewind;
     // timeshiftOffsetSec non-null = currently watching that many seconds behind the live edge.
     onRewindLive: (() -> Unit)? = null,
@@ -437,6 +439,10 @@ fun PlayerHud(
                 canZap && (e.key == Key.ChannelDown || e.key == Key.MediaPrevious) -> { zap(-1); true }
                 canZap && !controlsVisible && e.key == Key.DirectionUp -> { zap(1); true }
                 canZap && !controlsVisible && e.key == Key.DirectionDown -> { zap(-1); true }
+                // GUIDE is a dedicated appliance-style key and works whether the HUD is visible or hidden.
+                onOpenGuide != null && e.type == KeyEventType.KeyDown && e.nativeKeyEvent.keyCode == android.view.KeyEvent.KEYCODE_GUIDE -> {
+                    onOpenGuide(); true
+                }
                 // The category list lives at logical Start; history lives at logical End.
                 onOpenChannelList != null && !controlsVisible &&
                     e.key.horizontalDirection(layoutDirection) == HorizontalDirection.START -> { onOpenChannelList(); true }

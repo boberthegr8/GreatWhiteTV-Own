@@ -93,7 +93,7 @@ fun CategoryBrowserOverlay(
 
     BackHandler { onDismiss() }
 
-    Box(modifier = modifier.fillMaxSize().modalScrim(strength = 0.58f)) {
+    Box(modifier = modifier.fillMaxSize().modalScrim(strength = 0.34f)) {
         Column(
             modifier = Modifier
                 .align(Alignment.CenterStart)
