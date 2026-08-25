@@ -81,7 +81,6 @@ fun CategoryBrowserOverlay(
     val slideOffset by animateDpAsState(
         targetValue = if (revealed) 0.dp else hiddenOffset,
         animationSpec = tween(durationMillis = 190),
-        label = "gwsCategoryDrawerOffset",
     )
 
     LaunchedEffect(Unit) {
