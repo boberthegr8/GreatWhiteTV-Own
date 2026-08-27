@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- GWS v1.0.18: deliberately buried, optional public M3U source library. -->
+    <string name="gws_public_library_advanced">Advanced</string>
+    <string name="gws_public_library_chooser_subtitle">Built-in public M3U library</string>
+    <string name="gws_public_library_chooser_note">Advanced sources are optional third-party public playlists and stay separate from your main provider.</string>
+    <string name="gws_public_library_title">Advanced - Public Playlist Library</string>
+    <string name="gws_public_library_description">Optional third-party public/free M3U sources. Availability can change without notice and some streams may be geo-restricted. These sources remain separate from your main provider playlist.</string>
+    <string name="gws_public_library_install">Install</string>
+    <string name="gws_public_library_install_all">Install All</string>
+    <string name="gws_public_library_remove">Remove</string>
+    <string name="gws_public_library_remove_all">Remove All</string>
+    <string name="gws_public_library_working">Working\u2026</string>
+    <string name="gws_public_library_installing">Installing</string>
+    <string name="gws_public_library_installing_ellipsis">Installing\u2026</string>
+    <string name="gws_public_library_queued">Queued</string>
+    <string name="gws_public_library_installed">Installed</string>
+    <string name="gws_public_library_not_installed">Not installed</string>
+    <string name="gws_public_library_removing">Removing</string>
+    <string name="gws_public_library_count"><xliff:g xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2" id="installed">%1$d</xliff:g> / <xliff:g xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2" id="total">%2$d</xliff:g> installed</string>
+    <string name="gws_public_library_already_installed">Everything selected is already installed.</string>
+    <string name="gws_public_library_installed_notice">Installed %1$s.</string>
+    <string name="gws_public_library_install_failed">Could not install %1$s. The source may be temporarily unavailable.</string>
+    <string name="gws_public_library_install_failed_generic">A public playlist could not be installed.</string>
+    <string name="gws_public_library_none_installed">No built-in public playlists are installed.</string>
+    <string name="gws_public_library_removing_all">Removing all built-in public playlists.</string>
+
+    <string name="gws_public_iptv_org_worldwide_name">IPTV-org Worldwide</string>
+    <string name="gws_public_iptv_org_worldwide_desc">Worldwide public channel directory</string>
+    <string name="gws_public_iptv_org_canada_name">IPTV-org Canada</string>
+    <string name="gws_public_iptv_org_canada_desc">Canada public channels</string>
+    <string name="gws_public_iptv_org_usa_name">IPTV-org USA</string>
+    <string name="gws_public_iptv_org_usa_desc">United States public channels</string>
+    <string name="gws_public_iptv_org_sports_name">IPTV-org Sports</string>
+    <string name="gws_public_iptv_org_sports_desc">Public sports-category channels</string>
+    <string name="gws_public_iptv_org_movies_name">IPTV-org Movies</string>
+    <string name="gws_public_iptv_org_movies_desc">Public movie-category channels</string>
+    <string name="gws_public_iptv_org_news_name">IPTV-org News</string>
+    <string name="gws_public_iptv_org_news_desc">Public news-category channels</string>
+    <string name="gws_public_pluto_global_name">Pluto TV - Global</string>
+    <string name="gws_public_pluto_global_desc">Community-generated Pluto FAST playlist</string>
+    <string name="gws_public_samsung_global_name">Samsung TV Plus - Global</string>
+    <string name="gws_public_samsung_global_desc">Community-generated Samsung TV Plus FAST playlist</string>
+    <string name="gws_public_plex_canada_name">Plex TV - Canada</string>
+    <string name="gws_public_plex_canada_desc">Community-generated Plex Canada FAST playlist</string>
+    <string name="gws_public_free_tv_name">Free-TV</string>
+    <string name="gws_public_free_tv_desc">Free-TV public channel playlist</string>
+</resources>
