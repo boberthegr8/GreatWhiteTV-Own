@@ -27,32 +27,22 @@
 
     <string name="gws_public_iptv_org_worldwide_name">IPTV-org Worldwide</string>
     <string name="gws_public_iptv_org_worldwide_desc">Worldwide public channel directory</string>
-    <string name="gws_public_iptv_org_worldwide_url" translatable="false">https://iptv-org.github.io/iptv/index.m3u</string>
     <string name="gws_public_iptv_org_canada_name">IPTV-org Canada</string>
     <string name="gws_public_iptv_org_canada_desc">Canada public channels</string>
-    <string name="gws_public_iptv_org_canada_url" translatable="false">https://iptv-org.github.io/iptv/countries/ca.m3u</string>
     <string name="gws_public_iptv_org_usa_name">IPTV-org USA</string>
     <string name="gws_public_iptv_org_usa_desc">United States public channels</string>
-    <string name="gws_public_iptv_org_usa_url" translatable="false">https://iptv-org.github.io/iptv/countries/us.m3u</string>
     <string name="gws_public_iptv_org_sports_name">IPTV-org Sports</string>
     <string name="gws_public_iptv_org_sports_desc">Public sports-category channels</string>
-    <string name="gws_public_iptv_org_sports_url" translatable="false">https://iptv-org.github.io/iptv/categories/sports.m3u</string>
     <string name="gws_public_iptv_org_movies_name">IPTV-org Movies</string>
     <string name="gws_public_iptv_org_movies_desc">Public movie-category channels</string>
-    <string name="gws_public_iptv_org_movies_url" translatable="false">https://iptv-org.github.io/iptv/categories/movies.m3u</string>
     <string name="gws_public_iptv_org_news_name">IPTV-org News</string>
     <string name="gws_public_iptv_org_news_desc">Public news-category channels</string>
-    <string name="gws_public_iptv_org_news_url" translatable="false">https://iptv-org.github.io/iptv/categories/news.m3u</string>
     <string name="gws_public_pluto_global_name">Pluto TV - Global</string>
     <string name="gws_public_pluto_global_desc">Community-generated Pluto FAST playlist</string>
-    <string name="gws_public_pluto_global_url" translatable="false">https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plutotv_all.m3u</string>
     <string name="gws_public_samsung_global_name">Samsung TV Plus - Global</string>
     <string name="gws_public_samsung_global_desc">Community-generated Samsung TV Plus FAST playlist</string>
-    <string name="gws_public_samsung_global_url" translatable="false">https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/samsungtvplus_all.m3u</string>
     <string name="gws_public_plex_canada_name">Plex TV - Canada</string>
     <string name="gws_public_plex_canada_desc">Community-generated Plex Canada FAST playlist</string>
-    <string name="gws_public_plex_canada_url" translatable="false">https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plex_ca.m3u</string>
     <string name="gws_public_free_tv_name">Free-TV</string>
     <string name="gws_public_free_tv_desc">Free-TV public channel playlist</string>
-    <string name="gws_public_free_tv_url" translatable="false">https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8</string>
 </resources>
