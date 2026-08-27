@@ -98,14 +98,14 @@ fun AddSourceChooserScreen(
                 )
                 ChooserCard(
                     icon = OwnTVIcon.PLAYLIST,
-                    title = "Advanced",
-                    subtitle = "Built-in public M3U library",
+                    title = stringResource(R.string.gws_public_library_advanced),
+                    subtitle = stringResource(R.string.gws_public_library_chooser_subtitle),
                     onClick = { showPublicLibrary = true },
                 )
             }
             Spacer(Modifier.height(16.dp))
             Text(
-                "Advanced sources are optional third-party public playlists and stay separate from your main provider.",
+                stringResource(R.string.gws_public_library_chooser_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.onSurfaceVariant,
                 textAlign = TextAlign.Center,
