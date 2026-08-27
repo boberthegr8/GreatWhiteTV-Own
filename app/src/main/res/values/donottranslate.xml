@@ -20,15 +20,59 @@
     <string name="settings_font_dancing_script" translatable="false">Dancing Script</string>
     <string name="settings_font_poppins" translatable="false">Poppins</string>
 
-    <!-- GWS v1.0.18: fixed public/free M3U endpoints compiled into the APK. -->
+    <!-- GWS v1.0.18: deliberately buried, English-only advanced public M3U manager. -->
+    <string name="gws_public_library_advanced" translatable="false">Advanced</string>
+    <string name="gws_public_library_chooser_subtitle" translatable="false">Built-in public M3U library</string>
+    <string name="gws_public_library_chooser_note" translatable="false">Advanced sources are optional third-party public playlists and stay separate from your main provider.</string>
+    <string name="gws_public_library_title" translatable="false">Advanced - Public Playlist Library</string>
+    <string name="gws_public_library_description" translatable="false">Optional third-party public/free M3U sources. Availability can change without notice and some streams may be geo-restricted. These sources remain separate from your main provider playlist.</string>
+    <string name="gws_public_library_install" translatable="false">Install</string>
+    <string name="gws_public_library_install_all" translatable="false">Install All</string>
+    <string name="gws_public_library_remove" translatable="false">Remove</string>
+    <string name="gws_public_library_remove_all" translatable="false">Remove All</string>
+    <string name="gws_public_library_working" translatable="false">Working\u2026</string>
+    <string name="gws_public_library_installing" translatable="false">Installing</string>
+    <string name="gws_public_library_installing_ellipsis" translatable="false">Installing\u2026</string>
+    <string name="gws_public_library_queued" translatable="false">Queued</string>
+    <string name="gws_public_library_installed" translatable="false">Installed</string>
+    <string name="gws_public_library_not_installed" translatable="false">Not installed</string>
+    <string name="gws_public_library_removing" translatable="false">Removing</string>
+    <string name="gws_public_library_count" translatable="false">%1$d / %2$d installed</string>
+    <string name="gws_public_library_already_installed" translatable="false">Everything selected is already installed.</string>
+    <string name="gws_public_library_installed_notice" translatable="false">Installed %1$s.</string>
+    <string name="gws_public_library_install_failed" translatable="false">Could not install %1$s. The source may be temporarily unavailable.</string>
+    <string name="gws_public_library_install_failed_generic" translatable="false">A public playlist could not be installed.</string>
+    <string name="gws_public_library_none_installed" translatable="false">No built-in public playlists are installed.</string>
+    <string name="gws_public_library_removing_all" translatable="false">Removing all built-in public playlists.</string>
+
+    <string name="gws_public_iptv_org_worldwide_name" translatable="false">IPTV-org Worldwide</string>
+    <string name="gws_public_iptv_org_worldwide_desc" translatable="false">Worldwide public channel directory</string>
     <string name="gws_public_iptv_org_worldwide_url" translatable="false">https://iptv-org.github.io/iptv/index.m3u</string>
+    <string name="gws_public_iptv_org_canada_name" translatable="false">IPTV-org Canada</string>
+    <string name="gws_public_iptv_org_canada_desc" translatable="false">Canada public channels</string>
     <string name="gws_public_iptv_org_canada_url" translatable="false">https://iptv-org.github.io/iptv/countries/ca.m3u</string>
+    <string name="gws_public_iptv_org_usa_name" translatable="false">IPTV-org USA</string>
+    <string name="gws_public_iptv_org_usa_desc" translatable="false">United States public channels</string>
     <string name="gws_public_iptv_org_usa_url" translatable="false">https://iptv-org.github.io/iptv/countries/us.m3u</string>
+    <string name="gws_public_iptv_org_sports_name" translatable="false">IPTV-org Sports</string>
+    <string name="gws_public_iptv_org_sports_desc" translatable="false">Public sports-category channels</string>
     <string name="gws_public_iptv_org_sports_url" translatable="false">https://iptv-org.github.io/iptv/categories/sports.m3u</string>
+    <string name="gws_public_iptv_org_movies_name" translatable="false">IPTV-org Movies</string>
+    <string name="gws_public_iptv_org_movies_desc" translatable="false">Public movie-category channels</string>
     <string name="gws_public_iptv_org_movies_url" translatable="false">https://iptv-org.github.io/iptv/categories/movies.m3u</string>
+    <string name="gws_public_iptv_org_news_name" translatable="false">IPTV-org News</string>
+    <string name="gws_public_iptv_org_news_desc" translatable="false">Public news-category channels</string>
     <string name="gws_public_iptv_org_news_url" translatable="false">https://iptv-org.github.io/iptv/categories/news.m3u</string>
+    <string name="gws_public_pluto_global_name" translatable="false">Pluto TV - Global</string>
+    <string name="gws_public_pluto_global_desc" translatable="false">Community-generated Pluto FAST playlist</string>
     <string name="gws_public_pluto_global_url" translatable="false">https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plutotv_all.m3u</string>
+    <string name="gws_public_samsung_global_name" translatable="false">Samsung TV Plus - Global</string>
+    <string name="gws_public_samsung_global_desc" translatable="false">Community-generated Samsung TV Plus FAST playlist</string>
     <string name="gws_public_samsung_global_url" translatable="false">https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/samsungtvplus_all.m3u</string>
+    <string name="gws_public_plex_canada_name" translatable="false">Plex TV - Canada</string>
+    <string name="gws_public_plex_canada_desc" translatable="false">Community-generated Plex Canada FAST playlist</string>
     <string name="gws_public_plex_canada_url" translatable="false">https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plex_ca.m3u</string>
+    <string name="gws_public_free_tv_name" translatable="false">Free-TV</string>
+    <string name="gws_public_free_tv_desc" translatable="false">Free-TV public channel playlist</string>
     <string name="gws_public_free_tv_url" translatable="false">https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8</string>
 </resources>
