@@ -1,5 +1,6 @@
 name: GWS v1.0.18 Public Playlists Release
 
+# Retry after Compose resource lint fix.
 on:
   push:
     branches: [ main ]
