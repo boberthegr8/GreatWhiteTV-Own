@@ -47,79 +47,68 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 /**
  * GWS v1.0.18 advanced feature: a curated library of public/free M3U endpoints.
  *
- * These definitions are intentionally compiled into the APK. They are never mixed with, substituted
- * for, or used to mutate the user's primary provider/Hush source. Enabling one creates an ordinary
- * M3U SourceEntity through the same importer as Settings -> Playlists -> Add Source; disabling one
- * deletes only the SourceEntity whose exact URL matches the built-in definition.
+ * Definitions are compiled into the APK. They are never mixed with, substituted for, or used to
+ * mutate the user's primary provider/Hush source. Enabling one creates an ordinary M3U SourceEntity
+ * through the existing importer; disabling one deletes only a source whose exact URL matches a
+ * built-in endpoint.
  */
 internal data class PublicPlaylistDefinition(
-    val id: String,
     @StringRes val nameRes: Int,
     @StringRes val descriptionRes: Int,
-    val url: String,
+    @StringRes val urlRes: Int,
 )
 
 internal object PublicPlaylistCatalog {
     val all = listOf(
         PublicPlaylistDefinition(
-            id = "iptv_org_worldwide",
             nameRes = R.string.gws_public_iptv_org_worldwide_name,
             descriptionRes = R.string.gws_public_iptv_org_worldwide_desc,
-            url = "https://iptv-org.github.io/iptv/index.m3u",
+            urlRes = R.string.gws_public_iptv_org_worldwide_url,
         ),
         PublicPlaylistDefinition(
-            id = "iptv_org_canada",
             nameRes = R.string.gws_public_iptv_org_canada_name,
             descriptionRes = R.string.gws_public_iptv_org_canada_desc,
-            url = "https://iptv-org.github.io/iptv/countries/ca.m3u",
+            urlRes = R.string.gws_public_iptv_org_canada_url,
         ),
         PublicPlaylistDefinition(
-            id = "iptv_org_usa",
             nameRes = R.string.gws_public_iptv_org_usa_name,
             descriptionRes = R.string.gws_public_iptv_org_usa_desc,
-            url = "https://iptv-org.github.io/iptv/countries/us.m3u",
+            urlRes = R.string.gws_public_iptv_org_usa_url,
         ),
         PublicPlaylistDefinition(
-            id = "iptv_org_sports",
             nameRes = R.string.gws_public_iptv_org_sports_name,
             descriptionRes = R.string.gws_public_iptv_org_sports_desc,
-            url = "https://iptv-org.github.io/iptv/categories/sports.m3u",
+            urlRes = R.string.gws_public_iptv_org_sports_url,
         ),
         PublicPlaylistDefinition(
-            id = "iptv_org_movies",
             nameRes = R.string.gws_public_iptv_org_movies_name,
             descriptionRes = R.string.gws_public_iptv_org_movies_desc,
-            url = "https://iptv-org.github.io/iptv/categories/movies.m3u",
+            urlRes = R.string.gws_public_iptv_org_movies_url,
         ),
         PublicPlaylistDefinition(
-            id = "iptv_org_news",
             nameRes = R.string.gws_public_iptv_org_news_name,
             descriptionRes = R.string.gws_public_iptv_org_news_desc,
-            url = "https://iptv-org.github.io/iptv/categories/news.m3u",
+            urlRes = R.string.gws_public_iptv_org_news_url,
         ),
         PublicPlaylistDefinition(
-            id = "pluto_global",
             nameRes = R.string.gws_public_pluto_global_name,
             descriptionRes = R.string.gws_public_pluto_global_desc,
-            url = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plutotv_all.m3u",
+            urlRes = R.string.gws_public_pluto_global_url,
         ),
         PublicPlaylistDefinition(
-            id = "samsung_global",
             nameRes = R.string.gws_public_samsung_global_name,
             descriptionRes = R.string.gws_public_samsung_global_desc,
-            url = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/samsungtvplus_all.m3u",
+            urlRes = R.string.gws_public_samsung_global_url,
         ),
         PublicPlaylistDefinition(
-            id = "plex_canada",
             nameRes = R.string.gws_public_plex_canada_name,
             descriptionRes = R.string.gws_public_plex_canada_desc,
-            url = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plex_ca.m3u",
+            urlRes = R.string.gws_public_plex_canada_url,
         ),
         PublicPlaylistDefinition(
-            id = "free_tv",
             nameRes = R.string.gws_public_free_tv_name,
             descriptionRes = R.string.gws_public_free_tv_desc,
-            url = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
+            urlRes = R.string.gws_public_free_tv_url,
         ),
     )
 }
@@ -142,13 +131,14 @@ fun PublicPlaylistLibraryScreen(
     var active by remember { mutableStateOf<PublicPlaylistDefinition?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
 
-    val installedById: Map<String, SourceEntity> = remember(sources) {
+    val installedByKey: Map<Int, SourceEntity> = remember(sources) {
         val m3uByUrl = sources
             .asSequence()
             .filter { it.type == SourceType.M3U }
             .associateBy { it.url.publicPlaylistKey() }
         PublicPlaylistCatalog.all.mapNotNull { definition ->
-            m3uByUrl[definition.url.publicPlaylistKey()]?.let { definition.id to it }
+            val builtInUrl = context.getString(definition.urlRes).publicPlaylistKey()
+            m3uByUrl[builtInUrl]?.let { definition.nameRes to it }
         }.toMap()
     }
 
@@ -156,7 +146,7 @@ fun PublicPlaylistLibraryScreen(
 
     fun queueInstall(definitions: List<PublicPlaylistDefinition>) {
         if (busy) return
-        val missing = definitions.filter { it.id !in installedById }
+        val missing = definitions.filter { it.nameRes !in installedByKey }
         if (missing.isEmpty()) {
             notice = context.getString(R.string.gws_public_library_already_installed)
         } else {
@@ -176,7 +166,7 @@ fun PublicPlaylistLibraryScreen(
                     active = next
                     vm.addM3u(
                         name = context.getString(next.nameRes),
-                        url = next.url,
+                        url = context.getString(next.urlRes),
                         autoRefresh = PlaylistAutoRefresh.HOURS_24,
                         isDefault = false,
                     )
@@ -250,11 +240,11 @@ fun PublicPlaylistLibraryScreen(
                 label = stringResource(R.string.gws_public_library_remove_all),
                 onClick = {
                     if (!busy) {
-                        installedById.values
+                        installedByKey.values
                             .filter { it.id !in deletingIds }
                             .forEach(vm::delete)
                         notice = context.getString(
-                            if (installedById.isEmpty()) R.string.gws_public_library_none_installed
+                            if (installedByKey.isEmpty()) R.string.gws_public_library_none_installed
                             else R.string.gws_public_library_removing_all,
                         )
                     }
@@ -262,7 +252,7 @@ fun PublicPlaylistLibraryScreen(
                 style = OwnTVButtonStyle.SECONDARY,
             )
             Text(
-                stringResource(R.string.gws_public_library_count, installedById.size, PublicPlaylistCatalog.all.size),
+                stringResource(R.string.gws_public_library_count, installedByKey.size, PublicPlaylistCatalog.all.size),
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.onSurfaceVariant,
             )
@@ -278,11 +268,11 @@ fun PublicPlaylistLibraryScreen(
 
         Spacer(Modifier.height(14.dp))
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            items(PublicPlaylistCatalog.all, key = { it.id }) { definition ->
-                val installed = installedById[definition.id]
+            items(PublicPlaylistCatalog.all, key = { it.nameRes }) { definition ->
+                val installed = installedByKey[definition.nameRes]
                 val deleting = installed != null && installed.id in deletingIds
-                val isActive = active?.id == definition.id
-                val queued = pending.any { it.id == definition.id }
+                val isActive = active?.nameRes == definition.nameRes
+                val queued = pending.any { it.nameRes == definition.nameRes }
 
                 Row(
                     modifier = Modifier
@@ -322,7 +312,7 @@ fun PublicPlaylistLibraryScreen(
                             color = colors.onSurfaceVariant,
                         )
                         Text(
-                            definition.url,
+                            stringResource(definition.urlRes),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
                             maxLines = 1,
