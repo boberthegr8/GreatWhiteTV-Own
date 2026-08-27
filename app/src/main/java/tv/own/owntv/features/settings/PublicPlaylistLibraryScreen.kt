@@ -25,7 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -125,19 +125,19 @@ fun PublicPlaylistLibraryScreen(
     val importState by vm.importState.collectAsStateWithLifecycle()
     val deletingIds by vm.deletingSourceIds.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     var pending by remember { mutableStateOf<List<PublicPlaylistDefinition>>(emptyList()) }
     var active by remember { mutableStateOf<PublicPlaylistDefinition?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
 
-    val installedByKey: Map<Int, SourceEntity> = remember(sources) {
+    val installedByKey: Map<Int, SourceEntity> = remember(sources, resources) {
         val m3uByUrl = sources
             .asSequence()
             .filter { it.type == SourceType.M3U }
             .associateBy { it.url.publicPlaylistKey() }
         PublicPlaylistCatalog.all.mapNotNull { definition ->
-            val builtInUrl = context.getString(definition.urlRes).publicPlaylistKey()
+            val builtInUrl = resources.getString(definition.urlRes).publicPlaylistKey()
             m3uByUrl[builtInUrl]?.let { definition.nameRes to it }
         }.toMap()
     }
@@ -148,7 +148,7 @@ fun PublicPlaylistLibraryScreen(
         if (busy) return
         val missing = definitions.filter { it.nameRes !in installedByKey }
         if (missing.isEmpty()) {
-            notice = context.getString(R.string.gws_public_library_already_installed)
+            notice = resources.getString(R.string.gws_public_library_already_installed)
         } else {
             notice = null
             pending = missing
@@ -157,7 +157,7 @@ fun PublicPlaylistLibraryScreen(
 
     // The normal importer owns one foreground import job at a time. Drive Install All as a queue so
     // every playlist receives a complete import/finalize cycle instead of one add cancelling another.
-    LaunchedEffect(importState, pending, active) {
+    LaunchedEffect(importState, pending, active, resources) {
         when (importState) {
             SettingsViewModel.ImportState.Idle -> {
                 if (active == null && pending.isNotEmpty()) {
@@ -165,8 +165,8 @@ fun PublicPlaylistLibraryScreen(
                     pending = pending.drop(1)
                     active = next
                     vm.addM3u(
-                        name = context.getString(next.nameRes),
-                        url = context.getString(next.urlRes),
+                        name = resources.getString(next.nameRes),
+                        url = resources.getString(next.urlRes),
                         autoRefresh = PlaylistAutoRefresh.HOURS_24,
                         isDefault = false,
                     )
@@ -175,15 +175,15 @@ fun PublicPlaylistLibraryScreen(
             SettingsViewModel.ImportState.Running -> Unit
             is SettingsViewModel.ImportState.Success -> {
                 notice = active?.let {
-                    context.getString(R.string.gws_public_library_installed_notice, context.getString(it.nameRes))
+                    resources.getString(R.string.gws_public_library_installed_notice, resources.getString(it.nameRes))
                 }
                 active = null
                 vm.resetImport()
             }
             is SettingsViewModel.ImportState.Failed -> {
                 notice = active?.let {
-                    context.getString(R.string.gws_public_library_install_failed, context.getString(it.nameRes))
-                } ?: context.getString(R.string.gws_public_library_install_failed_generic)
+                    resources.getString(R.string.gws_public_library_install_failed, resources.getString(it.nameRes))
+                } ?: resources.getString(R.string.gws_public_library_install_failed_generic)
                 active = null
                 vm.resetImport()
             }
@@ -243,7 +243,7 @@ fun PublicPlaylistLibraryScreen(
                         installedByKey.values
                             .filter { it.id !in deletingIds }
                             .forEach(vm::delete)
-                        notice = context.getString(
+                        notice = resources.getString(
                             if (installedByKey.isEmpty()) R.string.gws_public_library_none_installed
                             else R.string.gws_public_library_removing_all,
                         )
