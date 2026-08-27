@@ -1,10 +1,10 @@
 package tv.own.owntv.features.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -32,6 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import org.koin.androidx.compose.koinViewModel
+import tv.own.owntv.R
 import tv.own.owntv.core.database.entity.SourceEntity
 import tv.own.owntv.core.model.SourceType
 import tv.own.owntv.features.settings.data.PlaylistAutoRefresh
@@ -51,8 +54,8 @@ import tv.own.owntv.ui.theme.OwnTVTheme
  */
 internal data class PublicPlaylistDefinition(
     val id: String,
-    val name: String,
-    val description: String,
+    @StringRes val nameRes: Int,
+    @StringRes val descriptionRes: Int,
     val url: String,
 )
 
@@ -60,62 +63,62 @@ internal object PublicPlaylistCatalog {
     val all = listOf(
         PublicPlaylistDefinition(
             id = "iptv_org_worldwide",
-            name = "IPTV-org Worldwide",
-            description = "Worldwide public channel directory",
+            nameRes = R.string.gws_public_iptv_org_worldwide_name,
+            descriptionRes = R.string.gws_public_iptv_org_worldwide_desc,
             url = "https://iptv-org.github.io/iptv/index.m3u",
         ),
         PublicPlaylistDefinition(
             id = "iptv_org_canada",
-            name = "IPTV-org Canada",
-            description = "Canada public channels",
+            nameRes = R.string.gws_public_iptv_org_canada_name,
+            descriptionRes = R.string.gws_public_iptv_org_canada_desc,
             url = "https://iptv-org.github.io/iptv/countries/ca.m3u",
         ),
         PublicPlaylistDefinition(
             id = "iptv_org_usa",
-            name = "IPTV-org USA",
-            description = "United States public channels",
+            nameRes = R.string.gws_public_iptv_org_usa_name,
+            descriptionRes = R.string.gws_public_iptv_org_usa_desc,
             url = "https://iptv-org.github.io/iptv/countries/us.m3u",
         ),
         PublicPlaylistDefinition(
             id = "iptv_org_sports",
-            name = "IPTV-org Sports",
-            description = "Public sports-category channels",
+            nameRes = R.string.gws_public_iptv_org_sports_name,
+            descriptionRes = R.string.gws_public_iptv_org_sports_desc,
             url = "https://iptv-org.github.io/iptv/categories/sports.m3u",
         ),
         PublicPlaylistDefinition(
             id = "iptv_org_movies",
-            name = "IPTV-org Movies",
-            description = "Public movie-category channels",
+            nameRes = R.string.gws_public_iptv_org_movies_name,
+            descriptionRes = R.string.gws_public_iptv_org_movies_desc,
             url = "https://iptv-org.github.io/iptv/categories/movies.m3u",
         ),
         PublicPlaylistDefinition(
             id = "iptv_org_news",
-            name = "IPTV-org News",
-            description = "Public news-category channels",
+            nameRes = R.string.gws_public_iptv_org_news_name,
+            descriptionRes = R.string.gws_public_iptv_org_news_desc,
             url = "https://iptv-org.github.io/iptv/categories/news.m3u",
         ),
         PublicPlaylistDefinition(
             id = "pluto_global",
-            name = "Pluto TV - Global",
-            description = "Community-generated Pluto FAST playlist",
+            nameRes = R.string.gws_public_pluto_global_name,
+            descriptionRes = R.string.gws_public_pluto_global_desc,
             url = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plutotv_all.m3u",
         ),
         PublicPlaylistDefinition(
             id = "samsung_global",
-            name = "Samsung TV Plus - Global",
-            description = "Community-generated Samsung TV Plus FAST playlist",
+            nameRes = R.string.gws_public_samsung_global_name,
+            descriptionRes = R.string.gws_public_samsung_global_desc,
             url = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/samsungtvplus_all.m3u",
         ),
         PublicPlaylistDefinition(
             id = "plex_canada",
-            name = "Plex TV - Canada",
-            description = "Community-generated Plex Canada FAST playlist",
+            nameRes = R.string.gws_public_plex_canada_name,
+            descriptionRes = R.string.gws_public_plex_canada_desc,
             url = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plex_ca.m3u",
         ),
         PublicPlaylistDefinition(
             id = "free_tv",
-            name = "Free-TV",
-            description = "Free-TV public channel playlist",
+            nameRes = R.string.gws_public_free_tv_name,
+            descriptionRes = R.string.gws_public_free_tv_desc,
             url = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8",
         ),
     )
@@ -133,6 +136,7 @@ fun PublicPlaylistLibraryScreen(
     val importState by vm.importState.collectAsStateWithLifecycle()
     val deletingIds by vm.deletingSourceIds.collectAsStateWithLifecycle()
     val colors = OwnTVTheme.colors
+    val context = LocalContext.current
 
     var pending by remember { mutableStateOf<List<PublicPlaylistDefinition>>(emptyList()) }
     var active by remember { mutableStateOf<PublicPlaylistDefinition?>(null) }
@@ -154,7 +158,7 @@ fun PublicPlaylistLibraryScreen(
         if (busy) return
         val missing = definitions.filter { it.id !in installedById }
         if (missing.isEmpty()) {
-            notice = "Everything selected is already installed."
+            notice = context.getString(R.string.gws_public_library_already_installed)
         } else {
             notice = null
             pending = missing
@@ -171,7 +175,7 @@ fun PublicPlaylistLibraryScreen(
                     pending = pending.drop(1)
                     active = next
                     vm.addM3u(
-                        name = next.name,
+                        name = context.getString(next.nameRes),
                         url = next.url,
                         autoRefresh = PlaylistAutoRefresh.HOURS_24,
                         isDefault = false,
@@ -180,13 +184,16 @@ fun PublicPlaylistLibraryScreen(
             }
             SettingsViewModel.ImportState.Running -> Unit
             is SettingsViewModel.ImportState.Success -> {
-                notice = active?.let { "Installed ${it.name}." }
+                notice = active?.let {
+                    context.getString(R.string.gws_public_library_installed_notice, context.getString(it.nameRes))
+                }
                 active = null
                 vm.resetImport()
             }
             is SettingsViewModel.ImportState.Failed -> {
-                notice = active?.let { "Could not install ${it.name}. The source may be temporarily unavailable." }
-                    ?: "A public playlist could not be installed."
+                notice = active?.let {
+                    context.getString(R.string.gws_public_library_install_failed, context.getString(it.nameRes))
+                } ?: context.getString(R.string.gws_public_library_install_failed_generic)
                 active = null
                 vm.resetImport()
             }
@@ -210,19 +217,19 @@ fun PublicPlaylistLibraryScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "Advanced - Public Playlist Library",
+                    stringResource(R.string.gws_public_library_title),
                     style = MaterialTheme.typography.headlineLarge,
                     color = colors.onSurface,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Optional third-party public/free M3U sources. Availability can change without notice and some streams may be geo-restricted. These sources remain separate from your main provider playlist.",
+                    stringResource(R.string.gws_public_library_description),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.width(16.dp))
-            OwnTVButton("Back", onClick = {
+            OwnTVButton(stringResource(R.string.common_back), onClick = {
                 vm.cancelImport()
                 pending = emptyList()
                 active = null
@@ -233,24 +240,29 @@ fun PublicPlaylistLibraryScreen(
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             OwnTVButton(
-                label = if (busy) "Installing..." else "Install All",
+                label = stringResource(
+                    if (busy) R.string.gws_public_library_installing_ellipsis
+                    else R.string.gws_public_library_install_all,
+                ),
                 onClick = { queueInstall(PublicPlaylistCatalog.all) },
             )
             OwnTVButton(
-                label = "Remove All",
+                label = stringResource(R.string.gws_public_library_remove_all),
                 onClick = {
                     if (!busy) {
                         installedById.values
                             .filter { it.id !in deletingIds }
                             .forEach(vm::delete)
-                        notice = if (installedById.isEmpty()) "No built-in public playlists are installed."
-                        else "Removing all built-in public playlists."
+                        notice = context.getString(
+                            if (installedById.isEmpty()) R.string.gws_public_library_none_installed
+                            else R.string.gws_public_library_removing_all,
+                        )
                     }
                 },
                 style = OwnTVButtonStyle.SECONDARY,
             )
             Text(
-                "${installedById.size} / ${PublicPlaylistCatalog.all.size} installed",
+                stringResource(R.string.gws_public_library_count, installedById.size, PublicPlaylistCatalog.all.size),
                 style = MaterialTheme.typography.labelLarge,
                 color = colors.onSurfaceVariant,
             )
@@ -268,7 +280,7 @@ fun PublicPlaylistLibraryScreen(
         LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(PublicPlaylistCatalog.all, key = { it.id }) { definition ->
                 val installed = installedById[definition.id]
-                val deleting = installed?.id in deletingIds
+                val deleting = installed != null && installed.id in deletingIds
                 val isActive = active?.id == definition.id
                 val queued = pending.any { it.id == definition.id }
 
@@ -283,27 +295,29 @@ fun PublicPlaylistLibraryScreen(
                     Column(Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                definition.name,
+                                stringResource(definition.nameRes),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = colors.onSurface,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                when {
-                                    deleting -> "Removing"
-                                    isActive -> "Installing"
-                                    queued -> "Queued"
-                                    installed != null -> "Installed"
-                                    else -> "Not installed"
-                                },
+                                stringResource(
+                                    when {
+                                        deleting -> R.string.gws_public_library_removing
+                                        isActive -> R.string.gws_public_library_installing
+                                        queued -> R.string.gws_public_library_queued
+                                        installed != null -> R.string.gws_public_library_installed
+                                        else -> R.string.gws_public_library_not_installed
+                                    },
+                                ),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (installed != null && !deleting) colors.primary else colors.onSurfaceVariant,
                             )
                         }
                         Spacer(Modifier.height(3.dp))
                         Text(
-                            definition.description,
+                            stringResource(definition.descriptionRes),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.onSurfaceVariant,
                         )
@@ -318,14 +332,18 @@ fun PublicPlaylistLibraryScreen(
                     Spacer(Modifier.width(14.dp))
                     when {
                         deleting -> OwnTVSpinner(sizeDp = 22)
-                        isActive || queued -> OwnTVButton("Working...", onClick = {}, style = OwnTVButtonStyle.SECONDARY)
+                        isActive || queued -> OwnTVButton(
+                            stringResource(R.string.gws_public_library_working),
+                            onClick = {},
+                            style = OwnTVButtonStyle.SECONDARY,
+                        )
                         installed != null -> OwnTVButton(
-                            "Remove",
+                            stringResource(R.string.gws_public_library_remove),
                             onClick = { if (!busy) vm.delete(installed) },
                             style = OwnTVButtonStyle.SECONDARY,
                         )
                         else -> OwnTVButton(
-                            "Install",
+                            stringResource(R.string.gws_public_library_install),
                             onClick = { queueInstall(listOf(definition)) },
                         )
                     }
