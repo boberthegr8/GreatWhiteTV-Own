@@ -1,6 +1,6 @@
 name: GWS v1.0.18 Public Playlists Release
 
-# Retry after Compose resource lint fix.
+# Final release run after playlist count lint fix.
 on:
   push:
     branches: [ main ]
@@ -20,27 +20,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-
       - name: Unit tests
         run: |
           chmod +x ./gradlew
           ./gradlew testStandardDebugUnitTest --stacktrace
-
       - name: Lint
         run: ./gradlew lintStandardDebug --stacktrace
-
       - name: Restore permanent GWS Online signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -51,10 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "$KEYSTORE_BASE64" ]; then
-            if [ -z "$KEYSTORE_PASSWORD_SECRET" ] || [ -z "$KEY_ALIAS_SECRET" ] || [ -z "$KEY_PASSWORD_SECRET" ]; then
-              echo "::error::KEYSTORE_BASE64 is configured but one or more signing credential secrets are missing."
-              exit 1
-            fi
+            if [ -z "$KEYSTORE_PASSWORD_SECRET" ] || [ -z "$KEY_ALIAS_SECRET" ] || [ -z "$KEY_PASSWORD_SECRET" ]; then exit 1; fi
             printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
             echo "::add-mask::$KEYSTORE_PASSWORD_SECRET"
             echo "::add-mask::$KEY_PASSWORD_SECRET"
@@ -66,22 +57,15 @@ jobs:
             mkdir -p "$RUNNER_TEMP/gws-signing"
             printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/gws-signing.zip"
             unzip -q "$RUNNER_TEMP/gws-signing.zip" -d "$RUNNER_TEMP/gws-signing"
-            test -s "$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks"
-            test -s "$RUNNER_TEMP/gws-signing/signing.env"
-            set -a
-            . "$RUNNER_TEMP/gws-signing/signing.env"
-            set +a
-            echo "::add-mask::$KEYSTORE_PASSWORD"
-            echo "::add-mask::$KEY_PASSWORD"
+            set -a; . "$RUNNER_TEMP/gws-signing/signing.env"; set +a
+            echo "::add-mask::$KEYSTORE_PASSWORD"; echo "::add-mask::$KEY_PASSWORD"
             echo "KEYSTORE_FILE=$RUNNER_TEMP/gws-signing/signing/GreatWhiteTV-release.jks" >> "$GITHUB_ENV"
             echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
             echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
             echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
           else
-            echo "::error::Refusing to publish GWS Online v1.0.18 without the permanent signing key."
-            exit 1
+            echo "::error::Permanent signing key unavailable"; exit 1
           fi
-
       - name: Derive the release edge key
         env:
           OWNTV_EDGE_MASTER: ${{ secrets.OWNTV_EDGE_MASTER }}
@@ -89,64 +73,38 @@ jobs:
         run: |
           if [ -n "$OWNTV_EDGE_MASTER" ]; then
             KEY=$(printf '%s' "$VERSION_NAME" | openssl dgst -sha256 -hmac "$OWNTV_EDGE_MASTER" -hex | awk '{print $NF}')
-            echo "::add-mask::$KEY"
-            echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
-          elif [ -n "$OWNTV_EDGE_KEY_SECRET" ]; then
-            echo "::add-mask::$OWNTV_EDGE_KEY_SECRET"
-            echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"
-          fi
-
+            echo "::add-mask::$KEY"; echo "OWNTV_EDGE_KEY=$KEY" >> "$GITHUB_ENV"
+          elif [ -n "$OWNTV_EDGE_KEY_SECRET" ]; then echo "::add-mask::$OWNTV_EDGE_KEY_SECRET"; echo "OWNTV_EDGE_KEY=$OWNTV_EDGE_KEY_SECRET" >> "$GITHUB_ENV"; fi
       - name: Build permanently signed release APKs
         run: |
           chmod +x ./gradlew
           ./gradlew assembleRelease --stacktrace
           ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
           X86_SRC=$(ls app/build/outputs/apk/x86_64/release/*.apk | head -n1)
-          echo "ARM_SRC=$ARM_SRC" >> "$GITHUB_ENV"
-          echo "X86_SRC=$X86_SRC" >> "$GITHUB_ENV"
-
+          echo "ARM_SRC=$ARM_SRC" >> "$GITHUB_ENV"; echo "X86_SRC=$X86_SRC" >> "$GITHUB_ENV"
       - name: Verify permanent APK signing identity
         run: |
           set -euo pipefail
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
-          test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs "$ARM_SRC"
           ACTUAL=$("$APKSIGNER" verify --print-certs "$ARM_SRC" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
-          if [ "$ACTUAL" != "$EXPECTED_CERT_SHA256" ]; then
-            echo "::error::APK signer mismatch. Refusing to publish an APK that cannot update existing GWS Online installs."
-            echo "Expected: $EXPECTED_CERT_SHA256"
-            echo "Actual:   $ACTUAL"
-            exit 1
-          fi
-          echo "Verified permanent GWS Online signing certificate: $ACTUAL"
-
+          [ "$ACTUAL" = "$EXPECTED_CERT_SHA256" ] || { echo "::error::APK signer mismatch"; exit 1; }
       - name: Name release APKs
         run: |
           mkdir -p dist
           cp "$ARM_SRC" "dist/GWSOnline-v${VERSION_NAME}.apk"
-          cp "$ARM_SRC" "dist/GWSOnline.apk"
-          cp "$ARM_SRC" "dist/GreatWhiteTV.apk"
-          cp "$ARM_SRC" "dist/OwnTV.apk"
-          if [ -n "${X86_SRC:-}" ]; then
-            cp "$X86_SRC" "dist/GWSOnline-x86_64-v${VERSION_NAME}.apk"
-          fi
-
+          cp "$ARM_SRC" dist/GWSOnline.apk
+          cp "$ARM_SRC" dist/GreatWhiteTV.apk
+          cp "$ARM_SRC" dist/OwnTV.apk
+          if [ -n "${X86_SRC:-}" ]; then cp "$X86_SRC" "dist/GWSOnline-x86_64-v${VERSION_NAME}.apk"; fi
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: GWSOnline-v1.0.18.apk
           path: dist/*.apk
           if-no-files-found: error
-
       - name: Extract release notes
         run: |
-          if [ -f CHANGELOG_APP.md ]; then
-            awk -v ver="v${VERSION_NAME}" '$0 ~ ("^## " ver "([ \t]|$)") { flag=1; next } /^## v/ && flag { flag=0 } flag { print }' CHANGELOG_APP.md > dist/RELEASE_NOTES.md || true
-          fi
-          if [ ! -s dist/RELEASE_NOTES.md ]; then
-            printf '%s\n' 'GWS Online v1.0.18 — Advanced Public Playlist Library with 10 built-in optional public/free M3U sources, individual/all install and removal, and 24-hour refresh.' > dist/RELEASE_NOTES.md
-          fi
-
+          printf '%s\n' 'GWS Online v1.0.18 — Advanced Public Playlist Library with 10 built-in optional public/free M3U sources, individual/all install and removal, and 24-hour refresh.' > dist/RELEASE_NOTES.md
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
