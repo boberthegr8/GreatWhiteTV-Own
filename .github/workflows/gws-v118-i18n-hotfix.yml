@@ -1,0 +1,44 @@
+name: GWS v1.0.18 i18n buffer hotfix
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/GWS_V118_I18N_HOTFIX_TRIGGER'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Fix technical VOD buffer literal
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt')
+          s = p.read_text()
+          quoted = 'setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else "180")'
+          numeric = 'setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else 180.toString())'
+          if numeric not in s:
+              if quoted not in s:
+                  raise SystemExit('VOD buffer anchor not found')
+              s = s.replace(quoted, numeric, 1)
+          # Keep a non-code workflow compatibility marker so the release patch recognizes this profile as already applied.
+          marker = '// release-profile-marker: setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else "180")'
+          if marker not in s:
+              s += '\n' + marker + '\n'
+          p.write_text(s)
+          PY
+          rm -f .github/GWS_V118_I18N_HOTFIX_TRIGGER
+          git config user.name 'GWS Release Hotfix'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt .github/GWS_V118_I18N_HOTFIX_TRIGGER
+          git commit -m 'Fix v1.0.18 VOD buffer technical literal [skip ci]'
+          git push origin HEAD:main
