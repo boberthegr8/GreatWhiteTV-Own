@@ -62,6 +62,10 @@ import tv.own.owntv.ui.theme.glass
  * then slides open when D-pad focus enters it so the icon labels are readable. The content panes keep
  * their approved fixed widths; only the navigation reservation animates between the existing rail and
  * drawer dimensions.
+ *
+ * GWS v1.0.18: TV Guide is part of Live TV, not an independent browse destination. The Guide child is
+ * revealed immediately below Live TV whenever Live or Guide is active, matching the Live -> Guide
+ * hierarchy used by dedicated IPTV players while preserving the existing EPG route.
  */
 @Composable
 fun Sidebar(
@@ -93,6 +97,18 @@ fun Sidebar(
         selected == MainSection.SETTINGS -> MainSection.SETTINGS
         selected in visibleSections -> selected
         else -> MainSection.browseOrder.firstOrNull { it in visibleSections } ?: MainSection.SETTINGS
+    }
+
+    val browseSections = remember(selected, visibleSections) {
+        MainSection.browseOrder
+            .filter { it in visibleSections && it != MainSection.EPG }
+            .toMutableList()
+            .apply {
+                if ((selected == MainSection.LIVE_TV || selected == MainSection.EPG) && MainSection.EPG in visibleSections) {
+                    val liveIndex = indexOf(MainSection.LIVE_TV)
+                    if (liveIndex >= 0) add(liveIndex + 1, MainSection.EPG)
+                }
+            }
     }
 
     Column(
@@ -127,18 +143,19 @@ fun Sidebar(
                     Spacer(Modifier.height(6.dp))
                 }
 
-                MainSection.browseOrder.filter { it in visibleSections }.forEach { section ->
+                browseSections.forEach { section ->
                     NavItem(
                         section = section,
                         active = section == selected,
                         expanded = expanded,
+                        nested = section == MainSection.EPG,
                         count = counts(section),
                         onClick = { onSelect(section) },
                         modifier = if (section == focusSection) {
                             Modifier.focusRequester(selectedItemFocusRequester)
                         } else Modifier,
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(if (section == MainSection.EPG) 6.dp else 4.dp))
                 }
 
                 NavItem(
@@ -294,12 +311,15 @@ private fun NavItem(
     count: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    nested: Boolean = false,
 ) {
     val colors = OwnTVTheme.colors
     val shape = RoundedCornerShape(13.dp)
     FocusableSurface(
         onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .then(if (nested && expanded) Modifier.padding(start = 20.dp) else Modifier)
+            .fillMaxWidth(),
         selected = active,
         shape = shape,
         focusedContainerColor = Color.Transparent,
@@ -312,14 +332,14 @@ private fun NavItem(
     ) { focused ->
         val ladder = rememberNavLadderColors(selected = active, focused = focused)
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-            NavAccentBar(visible = ladder.showAccentBar, height = 24.dp)
+            NavAccentBar(visible = ladder.showAccentBar, height = if (nested) 20.dp else 24.dp)
             Box(
                 modifier = Modifier
                     .then(
                         if (expanded) Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                         else Modifier.width(52.dp)
                     )
-                    .height(42.dp)
+                    .height(if (nested) 38.dp else 42.dp)
                     .clip(shape)
                     .glass(surface = GlassSurface.SIDEBAR, baseFill = ladder.container, shape = shape)
                     .then(
@@ -354,16 +374,16 @@ private fun NavItem(
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (nested) 10.dp else 12.dp),
                     ) {
                         NavDuotoneIcon(
                             section = section,
                             color = if (active) colors.onPrimaryContainer else ladder.icon,
-                            modifier = Modifier.size(28.dp),
+                            modifier = Modifier.size(if (nested) 22.dp else 28.dp),
                         )
                         Text(
                             text = stringResource(section.labelRes),
-                            style = MaterialTheme.typography.labelLarge,
+                            style = if (nested) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                             color = if (active) colors.onPrimaryContainer else ladder.icon,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                             maxLines = 1,
@@ -382,7 +402,7 @@ private fun NavItem(
                     NavDuotoneIcon(
                         section = section,
                         color = if (active) colors.onPrimaryContainer else ladder.icon,
-                        modifier = Modifier.size(28.dp),
+                        modifier = Modifier.size(if (nested) 24.dp else 28.dp),
                     )
                 }
             }
