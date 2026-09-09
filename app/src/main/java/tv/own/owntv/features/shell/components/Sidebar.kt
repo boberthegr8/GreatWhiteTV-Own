@@ -58,14 +58,12 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.glass
 
 /**
- * GWS Online navigation drawer. It stays as the approved compact icon rail while browsing content,
- * then slides open when D-pad focus enters it so the icon labels are readable. The content panes keep
- * their approved fixed widths; only the navigation reservation animates between the existing rail and
- * drawer dimensions.
+ * GWS Online navigation drawer.
  *
- * GWS v1.0.18: TV Guide is part of Live TV, not an independent browse destination. The Guide child is
- * revealed immediately below Live TV whenever Live or Guide is active, matching the Live -> Guide
- * hierarchy used by dedicated IPTV players while preserving the existing EPG route.
+ * GWS v1.0.18: the customer-facing main nav is intentionally minimal:
+ * Live TV, Movies, TV Shows, Settings. TV Guide is a child of Live TV and only appears directly under
+ * Live while Live/Guide is active. Other internal MainSection destinations remain available for deep
+ * links and supporting flows, but are not exposed as duplicate top-level navigation choices.
  */
 @Composable
 fun Sidebar(
@@ -92,23 +90,26 @@ fun Sidebar(
         label = "gwsSidebarWidth",
     )
 
-    val focusSection = when {
-        selected == MainSection.SEARCH -> MainSection.HOME
-        selected == MainSection.SETTINGS -> MainSection.SETTINGS
-        selected in visibleSections -> selected
-        else -> MainSection.browseOrder.firstOrNull { it in visibleSections } ?: MainSection.SETTINGS
+    val primarySections = remember(visibleSections) {
+        listOf(MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES)
+            .filter { it in visibleSections || visibleSections.isEmpty() }
+            .ifEmpty { listOf(MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES) }
     }
-
-    val browseSections = remember(selected, visibleSections) {
-        MainSection.browseOrder
-            .filter { it in visibleSections && it != MainSection.EPG }
-            .toMutableList()
-            .apply {
-                if ((selected == MainSection.LIVE_TV || selected == MainSection.EPG) && MainSection.EPG in visibleSections) {
-                    val liveIndex = indexOf(MainSection.LIVE_TV)
-                    if (liveIndex >= 0) add(liveIndex + 1, MainSection.EPG)
-                }
+    val browseSections = remember(selected, primarySections, visibleSections) {
+        primarySections.toMutableList().apply {
+            if ((selected == MainSection.LIVE_TV || selected == MainSection.EPG) &&
+                (MainSection.EPG in visibleSections || visibleSections.isEmpty())
+            ) {
+                val liveIndex = indexOf(MainSection.LIVE_TV)
+                if (liveIndex >= 0) add(liveIndex + 1, MainSection.EPG)
             }
+        }
+    }
+    val focusSection = when {
+        selected == MainSection.SETTINGS -> MainSection.SETTINGS
+        selected == MainSection.EPG && MainSection.EPG in browseSections -> MainSection.EPG
+        selected in primarySections -> selected
+        else -> primarySections.firstOrNull() ?: MainSection.SETTINGS
     }
 
     Column(
