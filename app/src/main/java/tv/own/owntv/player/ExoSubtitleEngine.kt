@@ -497,8 +497,8 @@ class ExoSubtitleEngine(
         applyRequestHeaders()
         val dataSource = androidx.media3.datasource.DefaultDataSource.Factory(context, http)
         // Match mpv's buffering depth so stability doesn't drop after the handoff (Dev refinement #3).
-        val maxBufferMs = (budget.cacheSecs.toIntOrNull() ?: 30) * 1000
-        val minBufferMs = (maxBufferMs / 2).coerceIn(15_000, maxBufferMs)
+        val maxBufferMs = 180_000
+        val minBufferMs = 60_000
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(minBufferMs, maxBufferMs, 2_500, 5_000)
             // Durations alone are not a memory bound: at 120 s (the top RAM tier) a 4K stream can ask the
