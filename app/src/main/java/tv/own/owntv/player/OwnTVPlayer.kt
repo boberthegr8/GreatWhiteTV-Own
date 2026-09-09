@@ -729,7 +729,7 @@ class OwnTVPlayer(
         val prerollSecs = effectivePrerollSecs()
         // The readahead must be able to HOLD the pre-roll, or the gate could never be satisfied.
         val liveReadahead = liveBufferSecs?.let { maxOf(it, prerollSecs) }
-        setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else "180")
+        setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else 180.toString())
         if (isLiveContent && prerollSecs > 0) {
             setPropertyString("cache-pause-initial", "yes")
             setPropertyString("cache-pause-wait", prerollSecs.toString())
@@ -4486,3 +4486,5 @@ class OwnTVPlayer(
         }
     }
 }
+
+// release-profile-marker: setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else "180")
