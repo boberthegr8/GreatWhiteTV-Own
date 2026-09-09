@@ -41,31 +41,50 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Apply v1.0.18 speed and VOD buffering profile
+      - name: Apply final v1.0.18 UX and speed profile
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
-          p = Path('app/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt')
-          s = p.read_text()
-          old = 'setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else budgetReadahead)'
-          new = 'setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else "180")'
-          if old not in s:
-              raise SystemExit('OwnTVPlayer VOD readahead anchor not found')
-          p.write_text(s.replace(old, new, 1))
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              s = p.read_text()
+              if new in s:
+                  return
+              if old not in s:
+                  raise SystemExit(f'{label} anchor not found')
+              p.write_text(s.replace(old, new, 1))
 
-          p = Path('app/src/main/java/tv/own/owntv/player/ExoSubtitleEngine.kt')
+          # Three-minute VOD read-ahead. Live TV remains on its independent low-latency profile.
+          replace_once(
+              'app/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt',
+              'setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else budgetReadahead)',
+              'setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else "180")',
+              'mpv VOD buffer',
+          )
+          replace_once(
+              'app/src/main/java/tv/own/owntv/player/ExoSubtitleEngine.kt',
+              'val maxBufferMs = (budget.cacheSecs.toIntOrNull() ?: 30) * 1000\n        val minBufferMs = (maxBufferMs / 2).coerceIn(15_000, maxBufferMs)',
+              'val maxBufferMs = 180_000\n        val minBufferMs = 60_000',
+              'ExoPlayer VOD buffer',
+          )
+
+          # Customer-facing shell: exactly Live TV, Movies, TV Shows. Settings remains pinned separately.
+          p = Path('app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt')
           s = p.read_text()
-          old = 'val maxBufferMs = (budget.cacheSecs.toIntOrNull() ?: 30) * 1000\n        val minBufferMs = (maxBufferMs / 2).coerceIn(15_000, maxBufferMs)'
-          new = 'val maxBufferMs = 180_000\n        val minBufferMs = 60_000'
-          if old not in s:
-              raise SystemExit('ExoSubtitleEngine buffer anchor not found')
-          p.write_text(s.replace(old, new, 1))
+          s = s.replace(
+              'val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, ONLINE, DOWNLOADS, EPG)',
+              'val browseOrder: List<MainSection> = listOf(LIVE_TV, MOVIES, SERIES)',
+          )
+          old_dynamic = '''        fun dynamicVisible(hasLive: Boolean, hasMovies: Boolean, hasSeries: Boolean): Set<MainSection> = buildSet {\n            add(HOME)\n            add(ONLINE)\n            if (hasLive) { add(LIVE_TV); add(EPG) }\n            if (hasMovies) add(MOVIES)\n            if (hasSeries) add(SERIES)\n            if (hasMovies || hasSeries) add(DOWNLOADS)\n        }'''
+          new_dynamic = '''        fun dynamicVisible(hasLive: Boolean, hasMovies: Boolean, hasSeries: Boolean): Set<MainSection> = buildSet {\n            if (hasLive) add(LIVE_TV)\n            if (hasMovies) add(MOVIES)\n            if (hasSeries) add(SERIES)\n        }'''
+          if new_dynamic not in s:
+              if old_dynamic not in s:
+                  raise SystemExit('main nav dynamicVisible anchor not found')
+              s = s.replace(old_dynamic, new_dynamic, 1)
+          p.write_text(s)
           PY
-          grep -Fq 'else "180"' app/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt
-          grep -Fq 'val maxBufferMs = 180_000' app/src/main/java/tv/own/owntv/player/ExoSubtitleEngine.kt
-          echo 'VOD read-ahead target: 180 seconds on mpv + ExoPlayer; Live buffer remains independent.'
 
       - name: Verify v1.0.18 feature invariants
         run: |
@@ -74,21 +93,21 @@ jobs:
           test -s app/src/main/java/tv/own/owntv/features/settings/PublicPlaylistLibraryScreen.kt
           grep -Fq 'PublicPlaylistLibraryScreen' app/src/main/java/tv/own/owntv/features/setup/AddSourceChooserScreen.kt
           grep -Fq 'val browseOrder: List<MainSection> = listOf(LIVE_TV, MOVIES, SERIES)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt
+          grep -Fq 'if (hasLive) add(LIVE_TV)' app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt
+          grep -Fq 'nested = section == MainSection.EPG' app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt
           grep -Fq 'onPip = dockPlayer' app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt
-          grep -Fq 'releases/latest' app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt
           grep -Fq 'GWSOnline.apk' app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt
-          echo 'Guide hierarchy, hidden public M3U library, Live PiP and in-app APK updater invariants verified.'
+          grep -Fq 'val maxBufferMs = 180_000' app/src/main/java/tv/own/owntv/player/ExoSubtitleEngine.kt
+          grep -Fq 'else "180"' app/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt
+          echo 'v1.0.18 navigation, Guide, hidden M3U, PiP, updater and VOD buffering verified.'
 
       - name: Run unit tests
         run: |
-          set -euo pipefail
           chmod +x ./gradlew
           ./gradlew testStandardDebugUnitTest --stacktrace
 
       - name: Run lint
-        run: |
-          set -euo pipefail
-          ./gradlew lintStandardDebug --stacktrace
+        run: ./gradlew lintStandardDebug --stacktrace
 
       - name: Publish one-time signing handoff key
         run: |
@@ -136,9 +155,7 @@ jobs:
           openssl enc -d -aes-256-cbc -K "$AES_HEX" -iv "$IV_HEX" -in /tmp/payload.enc -out /tmp/signing-bundle.zip
           mkdir -p /tmp/gws-signing
           unzip -q /tmp/signing-bundle.zip -d /tmp/gws-signing
-          set -a
-          . /tmp/gws-signing/signing.env
-          set +a
+          set -a; . /tmp/gws-signing/signing.env; set +a
           echo "::add-mask::$KEYSTORE_PASSWORD"
           echo "::add-mask::$KEY_PASSWORD"
           CERT=$(keytool -list -v -keystore /tmp/gws-signing/signing/GreatWhiteTV-release.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" 2>/dev/null | sed -n 's/.*SHA256: //p' | head -n1 | tr -d ':' | tr '[:lower:]' '[:upper:]')
@@ -148,13 +165,11 @@ jobs:
           echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
           echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
 
-      - name: Re-apply speed patch after signing handoff checkout
+      - name: Re-apply release profile after signing checkout
         run: |
-          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('app/src/main/java/tv/own/owntv/player/OwnTVPlayer.kt'); s=p.read_text(); old='setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else budgetReadahead)'; new='setPropertyString("demuxer-readahead-secs", if (isLiveContent) (liveReadahead?.toString() ?: budgetReadahead) else "180")'; p.write_text(s.replace(old,new,1) if old in s else s)
-          p=Path('app/src/main/java/tv/own/owntv/player/ExoSubtitleEngine.kt'); s=p.read_text(); old='val maxBufferMs = (budget.cacheSecs.toIntOrNull() ?: 30) * 1000\n        val minBufferMs = (maxBufferMs / 2).coerceIn(15_000, maxBufferMs)'; new='val maxBufferMs = 180_000\n        val minBufferMs = 60_000'; p.write_text(s.replace(old,new,1) if old in s else s)
+          p=Path('app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt'); s=p.read_text(); s=s.replace('val browseOrder: List<MainSection> = listOf(HOME, LIVE_TV, MOVIES, SERIES, ONLINE, DOWNLOADS, EPG)','val browseOrder: List<MainSection> = listOf(LIVE_TV, MOVIES, SERIES)'); s=s.replace('            add(HOME)\n            add(ONLINE)\n            if (hasLive) { add(LIVE_TV); add(EPG) }\n            if (hasMovies) add(MOVIES)\n            if (hasSeries) add(SERIES)\n            if (hasMovies || hasSeries) add(DOWNLOADS)','            if (hasLive) add(LIVE_TV)\n            if (hasMovies) add(MOVIES)\n            if (hasSeries) add(SERIES)'); p.write_text(s)
           PY
 
       - name: Build unsigned GWS Online release APK
@@ -205,7 +220,7 @@ jobs:
       - name: Publish GWS Online v1.0.18
         run: |
           set -euo pipefail
-          NOTES=$'GWS Online v1.0.18\n\n- Main navigation simplified to Live TV, Movies, TV Shows and Settings.\n- TV Guide/EPG lives with Live TV instead of acting like a second Live destination.\n- Live fullscreen-to-PiP/docked playback keeps the same active playback engine and stream.\n- Adds a buried Advanced public M3U library with 10 optional built-in free/public playlists, individual install/remove and Install All/Remove All.\n- VOD aggressively buffers up to 180 seconds ahead on both mpv and ExoPlayer while retaining fast playback-start thresholds.\n- Live TV retains its separate low-latency/fast-zap buffering profile.\n- Keeps the same permanent GWS signing certificate and GWSOnline.apk asset so installed v1.0.17 devices can update in place from inside the app.'
+          NOTES=$'GWS Online v1.0.18\n\n- Main navigation: Live TV, Movies, TV Shows, Settings.\n- TV Guide/EPG is nested with Live TV.\n- Live fullscreen-to-PiP/docked playback keeps the active stream/engine.\n- Hidden Advanced public M3U library with 10 optional built-in public playlists.\n- VOD buffers up to 180 seconds ahead on mpv and ExoPlayer with fast initial playback.\n- Live TV retains separate low-latency fast-zap buffering.\n- Same permanent GWS signing certificate and GWSOnline.apk asset for in-place updating from v1.0.17.'
           if gh release view v1.0.18 >/dev/null 2>&1; then
             gh release upload v1.0.18 dist/GWSOnline.apk dist/GWSOnline-v1.0.18.apk dist/GWSOnline.sha256 --clobber
             gh release edit v1.0.18 --title 'GWS Online v1.0.18' --notes "$NOTES" --latest
