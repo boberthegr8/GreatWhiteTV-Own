@@ -1,5 +1,5 @@
 version=1.0.18
 run_id=34418175532
-apk_cert_sha256=unavailable
-public_urls_ok=false
+apk_cert_sha256=EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C
+public_urls_ok=true
 vod_buffer_seconds=180
