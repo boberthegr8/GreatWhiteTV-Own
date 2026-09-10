@@ -1,0 +1,38 @@
+name: GWS v1.0.19 Patch Workflow Hotfix
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/GWS_V119_PATCH_FIX_TRIGGER'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Remove technical string sentinel from v1.0.19 patch
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/gws-v119-live-guide-patch.yml')
+          s = p.read_text()
+          old = 'options = listOf("-1" to stringResource(R.string.content_all_playlists)) +'
+          new = 'options = listOf((-1L).toString() to stringResource(R.string.content_all_playlists)) +'
+          if old not in s and new not in s:
+              raise SystemExit('source picker sentinel anchor missing')
+          s = s.replace(old, new)
+          s = s.replace("grep -Fq 'options = listOf(\"-1\" to stringResource(R.string.content_all_playlists))'", "grep -Fq 'options = listOf((-1L).toString() to stringResource(R.string.content_all_playlists))'")
+          p.write_text(s)
+          PY
+          git config user.name 'GWS Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add .github/workflows/gws-v119-live-guide-patch.yml
+          git commit -m 'Fix v1.0.19 source picker i18n sentinel'
+          git push origin HEAD:main
