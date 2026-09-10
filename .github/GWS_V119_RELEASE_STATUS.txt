@@ -1,0 +1,4 @@
+version=1.0.19
+run_id=34428207525
+certificate_sha256=not-built
+public_updater_ok=false
