@@ -1,0 +1,164 @@
+name: GWS v1.0.19 Live Guide Patch
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/GWS_V119_LIVE_GUIDE_TRIGGER'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply v1.0.19 Live TV guide UX
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              s = p.read_text()
+              if new in s:
+                  return
+              if old not in s:
+                  raise SystemExit(f'{label}: anchor not found')
+              p.write_text(s.replace(old, new, 1))
+
+          # Version: this is a new update after the already-published 1.0.18 APK.
+          Path('GWS_VERSION').write_text('1.0.19\n')
+
+          # Cable/satellite density: about two hours of guide fit in the programme area on a normal TV.
+          p = Path('app/src/main/java/tv/own/owntv/features/epg/GuideCore.kt')
+          s = p.read_text()
+          s = s.replace('    val ChannelCol = 176.dp\n    val RowHeight = 64.dp\n    val PxPerMin = 4.dp',
+                        '    val ChannelCol = 200.dp\n    val RowHeight = 68.dp\n    val PxPerMin = 6.dp')
+          p.write_text(s)
+
+          # EPG ViewModel: expose active Live playlists and make the existing defaultSource filter selectable
+          # directly from the guide. -1 means All Playlists, matching the existing activeSourceIds helper.
+          p = Path('app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt')
+          s = p.read_text()
+          anchor = '''    /** Guide category filter: null = all channels, otherwise a provider/custom stable key. */\n    private val _categoryFilter = MutableStateFlow<String?>(null)\n    val categoryFilter: StateFlow<String?> = _categoryFilter.asStateFlow()\n'''
+          insert = anchor + '''\n    /** Live playlist switcher used by the cable-style guide. The public M3Us and provider accounts\n     *  are ordinary SourceEntity rows, so they all appear here without a second source system. */\n    val liveSources = activeProfileSources(settings, sourceDao)\n        .map { aps -> aps.sources.filter { it.syncLive && it.id in aps.liveSourceIds } }\n        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())\n\n    /** -1 = All Playlists; a positive id narrows Live TV and the Guide to that one source. */\n    val selectedSourceId: StateFlow<Long> = settings.defaultSourceId\n        .stateIn(viewModelScope, SharingStarted.Eagerly, -1L)\n\n    fun selectSource(sourceId: Long) {\n        viewModelScope.launch {\n            _categoryFilter.value = null\n            settings.setDefaultSource(sourceId)\n        }\n    }\n'''
+          if 'val liveSources = activeProfileSources(settings, sourceDao)' not in s:
+              if anchor not in s:
+                  raise SystemExit('EPG source-switcher anchor not found')
+              s = s.replace(anchor, insert, 1)
+          p.write_text(s)
+
+          # LiveViewModel follows the same source selection too. This keeps old list/deep-link code coherent
+          # even though the visible Live TV destination now opens the Guide.
+          p = Path('app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt')
+          s = p.read_text()
+          old = '''    private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)\n        .map { aps ->\n            sourceUaMap = aps.sources.associate { it.id to it.userAgent }\n            sourceById = aps.sources.associateBy { it.id }\n            Ctx(aps.profileId, aps.liveSourceIds)\n        }\n        .distinctUntilChanged()\n        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))'''
+          new = '''    private val ctx: StateFlow<Ctx> = combine(\n        activeProfileSources(settings, sourceDao),\n        settings.defaultSourceId,\n    ) { aps, selectedSourceId ->\n        sourceUaMap = aps.sources.associate { it.id to it.userAgent }\n        sourceById = aps.sources.associateBy { it.id }\n        val liveIds = selectedSourceId\n            .takeIf { it > 0L && it in aps.liveSourceIds }\n            ?.let(::listOf)\n            ?: aps.liveSourceIds\n        Ctx(aps.profileId, liveIds)\n    }\n        .distinctUntilChanged()\n        .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))'''
+          if new not in s:
+              if old not in s:
+                  raise SystemExit('LiveViewModel source-filter anchor not found')
+              s = s.replace(old, new, 1)
+          p.write_text(s)
+
+          # EPG screen: add source selector, denser cable-guide chrome, and keep NOW slightly inside the
+          # viewport so the viewer sees what is airing plus what is coming next instead of starting at an edge.
+          p = Path('app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt')
+          s = p.read_text()
+          old_collect = '''    val categoryFilter by vm.categoryFilter.collectAsStateWithLifecycle()\n    val guideCategories by vm.guideCategories.collectAsStateWithLifecycle()\n    val favoriteIds by vm.favoriteChannelIds.collectAsStateWithLifecycle()'''
+          new_collect = '''    val categoryFilter by vm.categoryFilter.collectAsStateWithLifecycle()\n    val guideCategories by vm.guideCategories.collectAsStateWithLifecycle()\n    val liveSources by vm.liveSources.collectAsStateWithLifecycle()\n    val selectedSourceId by vm.selectedSourceId.collectAsStateWithLifecycle()\n    val favoriteIds by vm.favoriteChannelIds.collectAsStateWithLifecycle()'''
+          if new_collect not in s:
+              if old_collect not in s:
+                  raise SystemExit('EPG collect anchor not found')
+              s = s.replace(old_collect, new_collect, 1)
+          s = s.replace('    var showCategoryPicker by remember { mutableStateOf(false) }',
+                        '    var showCategoryPicker by remember { mutableStateOf(false) }\n    var showSourcePicker by remember { mutableStateOf(false) }', 1)
+          s = s.replace('(minutesBack * GuideGridDefaults.PxPerMin.value).dp.toPx()',
+                        '((minutesBack - GuideGridDefaults.SlotMin / 2).coerceAtLeast(0) * GuideGridDefaults.PxPerMin.value).dp.toPx()', 2)
+          s = s.replace('.padding(horizontal = 32.dp, vertical = 24.dp)',
+                        '.padding(horizontal = 18.dp, vertical = 14.dp)', 1)
+          s = s.replace('Text(stringResource(R.string.content_epg_title), style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)',
+                        'Text(stringResource(R.string.common_nav_live_tv), style = MaterialTheme.typography.headlineMedium, color = colors.onSurface)', 1)
+
+          # Insert playlist chooser after the date, before the right-side guide controls.
+          header_anchor = '''            Spacer(Modifier.weight(1f))\n            // Guide sort: A–Z / Provider / Live TV (mirrors Live) / Catch-up (archive first; hidden when none).'''
+          header_new = '''            val selectedSourceName = if (selectedSourceId <= 0L) {\n                stringResource(R.string.content_all_playlists)\n            } else {\n                liveSources.firstOrNull { it.id == selectedSourceId }?.name\n                    ?: stringResource(R.string.content_all_playlists)\n            }\n            OwnTVButton(\n                selectedSourceName,\n                onClick = { showSourcePicker = true },\n                icon = OwnTVIcon.PLAYLIST,\n                style = OwnTVButtonStyle.SECONDARY,\n            )\n            Spacer(Modifier.weight(1f))\n            // Guide sort: A–Z / Provider / Live TV (mirrors Live) / Catch-up (archive first; hidden when none).'''
+          if 'onClick = { showSourcePicker = true }' not in s:
+              if header_anchor not in s:
+                  raise SystemExit('EPG header source button anchor not found')
+              s = s.replace(header_anchor, header_new, 1)
+
+          picker_anchor = '''    if (showCategoryPicker) {\n        tv.own.owntv.features.settings.PickerDialog('''
+          picker_new = '''    if (showSourcePicker) {\n        tv.own.owntv.features.settings.PickerDialog(\n            title = stringResource(R.string.common_nav_live_tv),\n            options = listOf("-1" to stringResource(R.string.content_all_playlists)) +\n                liveSources.map { it.id.toString() to it.name },\n            selected = selectedSourceId.toString(),\n            onSelect = { value ->\n                vm.selectSource(value.toLongOrNull() ?: -1L)\n                showSourcePicker = false\n            },\n            onDismiss = { showSourcePicker = false },\n            searchable = liveSources.size > 8,\n        )\n    }\n\n    if (showCategoryPicker) {\n        tv.own.owntv.features.settings.PickerDialog('''
+          if 'options = listOf("-1" to stringResource(R.string.content_all_playlists))' not in s:
+              if picker_anchor not in s:
+                  raise SystemExit('EPG source picker anchor not found')
+              s = s.replace(picker_anchor, picker_new, 1)
+          p.write_text(s)
+
+          # Visible navigation: one Live TV entry. The old EPG section remains internally for deep links,
+          # but it is not rendered as a second/nested Live destination.
+          p = Path('app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt')
+          s = p.read_text()
+          start = s.index('    val primarySections = remember(visibleSections) {')
+          end = s.index('\n\n    Column(', start)
+          replacement = '''    val primarySections = remember {\n        listOf(MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES)\n    }\n    val browseSections = primarySections\n    val focusSection = when {\n        selected == MainSection.SETTINGS -> MainSection.SETTINGS\n        selected == MainSection.EPG -> MainSection.LIVE_TV\n        selected in primarySections -> selected\n        else -> MainSection.LIVE_TV\n    }'''
+          s = s[:start] + replacement + s[end:]
+          s = s.replace('                        nested = section == MainSection.EPG,',
+                        '                        nested = false,')
+          s = s.replace('                    Spacer(Modifier.height(if (section == MainSection.EPG) 6.dp else 4.dp))',
+                        '                    Spacer(Modifier.height(4.dp))')
+          p.write_text(s)
+
+          # Shell: Live TV now IS the grid guide. Keep the internal EPG route rendering the same screen for
+          # old/deep links, and route Home's Guide action to Live TV.
+          p = Path('app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt')
+          s = p.read_text()
+          s = s.replace('if (selectedSection != MainSection.EPG) { tv.own.owntv.Perf.stamp("epg-preload"); epgVm.load() }',
+                        'if (selectedSection != MainSection.EPG && selectedSection != MainSection.LIVE_TV) { tv.own.owntv.Perf.stamp("epg-preload"); epgVm.load() }', 1)
+          s = s.replace('onOpenGuide = { onSelectSection(MainSection.EPG) },',
+                        'onOpenGuide = { onSelectSection(MainSection.LIVE_TV) },', 1)
+          pattern = re.compile(r'''                        selectedSection == MainSection\.LIVE_TV -> LiveScreen\(.*?\n                        \)\n\n                        selectedSection == MainSection\.MOVIES''', re.S)
+          replacement = '''                        selectedSection == MainSection.LIVE_TV -> EpgScreen(\n                            onBack = { runCatching { sidebarFocus.requestFocus() } },\n                            onFullscreen = { openFullscreen(MainSection.LIVE_TV) },\n                            onPlayChannel = { ch, _ ->\n                                restoreFocus = false\n                                liveVm.watchFromGuide(ch)\n                                zapSource = MainSection.LIVE_TV\n                                homeVm.stopPreview()\n                                if (playerMode != PlayerMode.MINI && !liveVm.externalPlayerOn.value) playerMode = PlayerMode.FULLSCREEN\n                            },\n                            onPlayCatchup = { ch, prog ->\n                                restoreFocus = false\n                                liveVm.playCatchupProgramme(ch, prog)\n                                zapSource = MainSection.LIVE_TV\n                                homeVm.stopPreview()\n                                if (playerMode != PlayerMode.MINI) playerMode = PlayerMode.FULLSCREEN\n                            },\n                            onAddEpg = { openEpgAdd = true; onSelectSection(MainSection.SETTINGS) },\n                            restoreFocus = restoreFocus,\n                            onRestored = { restoreFocus = false },\n                            onContentScrolled = { contentScrolled = it },\n                            modifier = Modifier\n                                .fillMaxSize()\n                                .onFocusChanged { if (it.hasFocus) focusedLayer = ShellLayer.CONTENT }\n                                .focusGroup(),\n                        )\n\n                        selectedSection == MainSection.MOVIES'''
+          s2, n = pattern.subn(replacement, s, count=1)
+          if n != 1 and 'selectedSection == MainSection.LIVE_TV -> EpgScreen(' not in s:
+              raise SystemExit('OwnTVShell LiveScreen route anchor not found')
+          p.write_text(s2 if n else s)
+          PY
+
+      - name: Verify source changes
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < GWS_VERSION)" = '1.0.19'
+          grep -Fq 'val PxPerMin = 6.dp' app/src/main/java/tv/own/owntv/features/epg/GuideCore.kt
+          grep -Fq 'val ChannelCol = 200.dp' app/src/main/java/tv/own/owntv/features/epg/GuideCore.kt
+          grep -Fq 'val liveSources = activeProfileSources(settings, sourceDao)' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'fun selectSource(sourceId: Long)' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'showSourcePicker = true' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'selectedSection == MainSection.LIVE_TV -> EpgScreen(' app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt
+          ! grep -Fq 'nested = section == MainSection.EPG' app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt
+
+      - name: Run unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testStandardDebugUnitTest --stacktrace
+
+      - name: Run lint
+        run: ./gradlew lintStandardDebug --stacktrace
+
+      - name: Commit v1.0.19 source
+        run: |
+          set -euo pipefail
+          git config user.name 'GWS Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add GWS_VERSION app/src/main/java/tv/own/owntv/features/epg/GuideCore.kt app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/src/main/java/tv/own/owntv/features/live/LiveViewModel.kt app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt app/src/main/java/tv/own/owntv/features/shell/components/Sidebar.kt
+          git commit -m 'GWS v1.0.19: make Live TV the cable-style guide'
+          git push origin HEAD:main
