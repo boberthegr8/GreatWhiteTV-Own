@@ -196,9 +196,12 @@ fun EpgScreen(
     val sortGuide by vm.sortGuide.collectAsStateWithLifecycle()
     val categoryFilter by vm.categoryFilter.collectAsStateWithLifecycle()
     val guideCategories by vm.guideCategories.collectAsStateWithLifecycle()
+    val liveSources by vm.liveSources.collectAsStateWithLifecycle()
+    val selectedSourceId by vm.selectedSourceId.collectAsStateWithLifecycle()
     val favoriteIds by vm.favoriteChannelIds.collectAsStateWithLifecycle()
     val catchupPlayer by vm.catchupPlayer.collectAsStateWithLifecycle()
     var showCategoryPicker by remember { mutableStateOf(false) }
+    var showSourcePicker by remember { mutableStateOf(false) }
     val colors = OwnTVTheme.colors
     val hScroll = rememberScrollState()
     val rowListState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -267,7 +270,7 @@ fun EpgScreen(
         if (state.channels.isEmpty()) return@LaunchedEffect
         val minutesBack = ((state.now - state.windowStart) / 60_000L).toInt()
         if (minutesBack <= GuideGridDefaults.SlotMin) return@LaunchedEffect // no real lookback → leave at the start
-        val px = with(density) { (minutesBack * GuideGridDefaults.PxPerMin.value).dp.toPx() }.toInt()
+        val px = with(density) { ((minutesBack - GuideGridDefaults.SlotMin / 2).coerceAtLeast(0) * GuideGridDefaults.PxPerMin.value).dp.toPx() }.toInt()
         // Wait until the time-axis row is laid out so maxValue is known — otherwise scrollTo runs before
         // layout and clamps to 0 (a no-op), leaving the strips at the past edge (no data yet) → blank guide
         // until a later real scroll. Bounded so we never hang if the row stays unscrollable.
@@ -285,7 +288,7 @@ fun EpgScreen(
         scope.launch {
             val minutesBack = ((state.now - state.windowStart) / 60_000L).toInt()
             if (minutesBack <= GuideGridDefaults.SlotMin) return@launch
-            val px = with(density) { (minutesBack * GuideGridDefaults.PxPerMin.value).dp.toPx() }.toInt()
+            val px = with(density) { ((minutesBack - GuideGridDefaults.SlotMin / 2).coerceAtLeast(0) * GuideGridDefaults.PxPerMin.value).dp.toPx() }.toInt()
             kotlinx.coroutines.withTimeoutOrNull(2000) {
                 androidx.compose.runtime.snapshotFlow { hScroll.maxValue }.first { it > 0 }
             }
@@ -344,14 +347,14 @@ fun EpgScreen(
             // (landing on the top bar) — trap vertical exits; Left/Right/Back leave normally.
             .trapVerticalFocusExit()
             .focusGroup()
-            .padding(horizontal = 32.dp, vertical = 24.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
         // Header: back + title + date + refresh
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FocusableSurface(onClick = onBack, modifier = Modifier.size(44.dp), shape = RoundedCornerShape(14.dp), contentAlignment = Alignment.Center, surface = GlassSurface.CARDS) { _ ->
                 OwnTVIcon(OwnTVIcon.BACK, tint = colors.onSurface, modifier = Modifier.size(20.dp))
             }
-            Text(stringResource(R.string.content_epg_title), style = MaterialTheme.typography.headlineLarge, color = colors.onSurface)
+            Text(stringResource(R.string.common_nav_live_tv), style = MaterialTheme.typography.headlineMedium, color = colors.onSurface)
             val formatHeaderDate = rememberBestDateFormatter("EEEdMMM")
             if (state.now > 0) {
                 // The day being browsed: "now" on open; follows the cursor when D-padding left into
@@ -366,6 +369,18 @@ fun EpgScreen(
             if (state.now in state.windowStart..state.windowEnd) {
                 OwnTVButton(stringResource(R.string.content_epg_jump_now), onClick = jumpToNow, icon = OwnTVIcon.HISTORY, style = OwnTVButtonStyle.SECONDARY)
             }
+            val selectedSourceName = if (selectedSourceId <= 0L) {
+                stringResource(R.string.content_all_playlists)
+            } else {
+                liveSources.firstOrNull { it.id == selectedSourceId }?.name
+                    ?: stringResource(R.string.content_all_playlists)
+            }
+            OwnTVButton(
+                selectedSourceName,
+                onClick = { showSourcePicker = true },
+                icon = OwnTVIcon.PLAYLIST,
+                style = OwnTVButtonStyle.SECONDARY,
+            )
             Spacer(Modifier.weight(1f))
             // Guide sort: A–Z / Provider / Live TV (mirrors Live) / Catch-up (archive first; hidden when none).
             val sortLabel = when {
@@ -556,6 +571,21 @@ fun EpgScreen(
             onAcceptAll = vm::acceptAllSuggestions,
             onSkipAll = vm::clearReview,
             onDone = vm::clearReview,
+        )
+    }
+
+    if (showSourcePicker) {
+        tv.own.owntv.features.settings.PickerDialog(
+            title = stringResource(R.string.common_nav_live_tv),
+            options = listOf((-1L).toString() to stringResource(R.string.content_all_playlists)) +
+                liveSources.map { it.id.toString() to it.name },
+            selected = selectedSourceId.toString(),
+            onSelect = { value ->
+                vm.selectSource(value.toLongOrNull() ?: -1L)
+                showSourcePicker = false
+            },
+            onDismiss = { showSourcePicker = false },
+            searchable = liveSources.size > 8,
         )
     }
 

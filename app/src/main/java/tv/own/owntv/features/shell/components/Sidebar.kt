@@ -90,26 +90,15 @@ fun Sidebar(
         label = "gwsSidebarWidth",
     )
 
-    val primarySections = remember(visibleSections) {
+    val primarySections = remember {
         listOf(MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES)
-            .filter { it in visibleSections || visibleSections.isEmpty() }
-            .ifEmpty { listOf(MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES) }
     }
-    val browseSections = remember(selected, primarySections, visibleSections) {
-        primarySections.toMutableList().apply {
-            if ((selected == MainSection.LIVE_TV || selected == MainSection.EPG) &&
-                (MainSection.EPG in visibleSections || visibleSections.isEmpty())
-            ) {
-                val liveIndex = indexOf(MainSection.LIVE_TV)
-                if (liveIndex >= 0) add(liveIndex + 1, MainSection.EPG)
-            }
-        }
-    }
+    val browseSections = primarySections
     val focusSection = when {
         selected == MainSection.SETTINGS -> MainSection.SETTINGS
-        selected == MainSection.EPG && MainSection.EPG in browseSections -> MainSection.EPG
+        selected == MainSection.EPG -> MainSection.LIVE_TV
         selected in primarySections -> selected
-        else -> primarySections.firstOrNull() ?: MainSection.SETTINGS
+        else -> MainSection.LIVE_TV
     }
 
     Column(
@@ -149,14 +138,14 @@ fun Sidebar(
                         section = section,
                         active = section == selected,
                         expanded = expanded,
-                        nested = section == MainSection.EPG,
+                        nested = false,
                         count = counts(section),
                         onClick = { onSelect(section) },
                         modifier = if (section == focusSection) {
                             Modifier.focusRequester(selectedItemFocusRequester)
                         } else Modifier,
                     )
-                    Spacer(Modifier.height(if (section == MainSection.EPG) 6.dp else 4.dp))
+                    Spacer(Modifier.height(4.dp))
                 }
 
                 NavItem(

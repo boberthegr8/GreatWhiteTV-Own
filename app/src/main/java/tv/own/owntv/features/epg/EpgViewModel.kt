@@ -135,6 +135,22 @@ class EpgViewModel(
     private val _categoryFilter = MutableStateFlow<String?>(null)
     val categoryFilter: StateFlow<String?> = _categoryFilter.asStateFlow()
 
+    /** Live playlist switcher used by the cable-style guide. */
+    val liveSources = activeProfileSources(settings, sourceDao)
+        .map { aps -> aps.sources.filter { it.syncLive && it.id in aps.liveSourceIds } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Negative id = All Playlists; a positive id narrows Live TV and Guide to one source. */
+    val selectedSourceId: StateFlow<Long> = settings.defaultSourceId
+        .stateIn(viewModelScope, SharingStarted.Eagerly, -1L)
+
+    fun selectSource(sourceId: Long) {
+        viewModelScope.launch {
+            _categoryFilter.value = null
+            settings.setDefaultSource(sourceId)
+        }
+    }
+
     /** Live categories for the active profile — drives the guide's "Category" picker. Applies the
      *  profile's Live customizations like the Live TV rail does: hidden categories stay out of the
      *  picker, renames show, manually reordered categories stay pinned first. */

@@ -67,9 +67,9 @@ import tv.own.owntv.ui.theme.PopupFontTheme
 import tv.own.owntv.ui.theme.glass
 
 internal object GuideGridDefaults {
-    val ChannelCol = 176.dp
-    val RowHeight = 64.dp
-    val PxPerMin = 4.dp
+    val ChannelCol = 200.dp
+    val RowHeight = 68.dp
+    val PxPerMin = 6.dp
     const val SlotMin = 30
 }
 

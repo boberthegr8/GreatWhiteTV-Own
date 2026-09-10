@@ -336,7 +336,7 @@ fun OwnTVShell(
     // and is skipped if the user is already on EPG.)
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(1_200)
-        if (selectedSection != MainSection.EPG) { tv.own.owntv.Perf.stamp("epg-preload"); epgVm.load() }
+        if (selectedSection != MainSection.EPG && selectedSection != MainSection.LIVE_TV) { tv.own.owntv.Perf.stamp("epg-preload"); epgVm.load() }
     }
 
     // Opening content from a browse screen goes fullscreen — UNLESS the player is already docked as a
@@ -629,7 +629,7 @@ fun OwnTVShell(
                             onPlayMovie = { id, pos -> scope.launch { if (movieVm.playByIdAsync(id, pos) && !movieVm.externalPlayerOn.value) openFullscreen(MainSection.MOVIES) } },
                             onPlayEpisode = { seriesId, epId, pos -> scope.launch { if (seriesVm.playFromHomeAsync(seriesId, epId, pos) && !seriesVm.externalPlayerOn.value) openFullscreen(MainSection.SERIES) } },
                             onPlayChannel = { id, zap -> scope.launch { if (liveVm.ensurePlayingByIdAsync(id, zap)) openFullscreen(MainSection.LIVE_TV) } },
-                            onOpenGuide = { onSelectSection(MainSection.EPG) },
+                            onOpenGuide = { onSelectSection(MainSection.LIVE_TV) },
                             onActivateTrending = { selected, onUnavailable ->
                                 scope.launch {
                                     when (val current = homeVm.revalidateTrendingItem(selected)) {
@@ -697,14 +697,31 @@ fun OwnTVShell(
                             modifier = Modifier.fillMaxSize(),
                         )
 
-                        selectedSection == MainSection.LIVE_TV -> LiveScreen(
-                            onFullscreen = { openFullscreen() },
-                            onChildFocused = { focusedLayer = ShellLayer.CONTENT },
-                            previewEnabled = playerMode == PlayerMode.NONE,
+                        selectedSection == MainSection.LIVE_TV -> EpgScreen(
+                            onBack = { runCatching { sidebarFocus.requestFocus() } },
+                            onFullscreen = { openFullscreen(MainSection.LIVE_TV) },
+                            onPlayChannel = { ch, _ ->
+                                restoreFocus = false
+                                liveVm.watchFromGuide(ch)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                                if (playerMode != PlayerMode.MINI && !liveVm.externalPlayerOn.value) playerMode = PlayerMode.FULLSCREEN
+                            },
+                            onPlayCatchup = { ch, prog ->
+                                restoreFocus = false
+                                liveVm.playCatchupProgramme(ch, prog)
+                                zapSource = MainSection.LIVE_TV
+                                homeVm.stopPreview()
+                                if (playerMode != PlayerMode.MINI) playerMode = PlayerMode.FULLSCREEN
+                            },
+                            onAddEpg = { openEpgAdd = true; onSelectSection(MainSection.SETTINGS) },
                             restoreFocus = restoreFocus,
                             onRestored = { restoreFocus = false },
                             onContentScrolled = { contentScrolled = it },
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onFocusChanged { if (it.hasFocus) focusedLayer = ShellLayer.CONTENT }
+                                .focusGroup(),
                         )
 
                         selectedSection == MainSection.MOVIES -> MoviesScreen(

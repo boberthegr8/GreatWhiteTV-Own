@@ -217,12 +217,18 @@ class LiveViewModel(
      *  setting. Per-playlist because the periodic-rebuffer problem it solves belongs to a provider. */
     private fun prerollFor(sourceId: Long?): Int? =
         sourceId?.let { sourceById[it]?.livePrerollSecs }?.takeIf { it >= 0 }
-    private val ctx: StateFlow<Ctx> = activeProfileSources(settings, sourceDao)
-        .map { aps ->
-            sourceUaMap = aps.sources.associate { it.id to it.userAgent }
-            sourceById = aps.sources.associateBy { it.id }
-            Ctx(aps.profileId, aps.liveSourceIds)
-        }
+    private val ctx: StateFlow<Ctx> = combine(
+        activeProfileSources(settings, sourceDao),
+        settings.defaultSourceId,
+    ) { aps, selectedSourceId ->
+        sourceUaMap = aps.sources.associate { it.id to it.userAgent }
+        sourceById = aps.sources.associateBy { it.id }
+        val liveIds = selectedSourceId
+            .takeIf { it > 0L && it in aps.liveSourceIds }
+            ?.let(::listOf)
+            ?: aps.liveSourceIds
+        Ctx(aps.profileId, liveIds)
+    }
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.Eagerly, Ctx(-1L, emptyList()))
 
