@@ -202,6 +202,7 @@ class EpgViewModel(
     // keeps the same window, so the cache stays valid and we skip the reload entirely).
     @Volatile private var cachedWindow: Pair<Long, Long>? = null
     @Volatile private var lastStored = -1 // stored programme count the cache was built from (data-change guard)
+    @Volatile private var autoRefreshAttemptedFor: Set<Long> = emptySet()
     // Bumped when the background catch-up lookback (pass 2) merges into rowCache, so visible rows re-read it.
     private val _cacheRevision = MutableStateFlow(0)
     val cacheRevision: StateFlow<Int> = _cacheRevision.asStateFlow()
@@ -263,7 +264,7 @@ class EpgViewModel(
                 afterId = page.last().id
                 if (page.size < EPG_WINDOW_PAGE) break
             }
-            all.groupBy { it.epgChannelId }.mapValues { (_, v) -> v.sortedBy { it.startMs } }
+            all.groupBy { it.epgChannelId.trim().lowercase() }.mapValues { (_, v) -> v.sortedBy { it.startMs } }
         }
 
     init {
@@ -762,7 +763,11 @@ class EpgViewModel(
                 _cacheRevision.value++
             }
 
-            val hasEpg = epgIds.isNotEmpty()
+            val hasEpg = stored > 0 || epgIds.isNotEmpty()
+            val noCurrentProgrammes = rowCache.values.none { it.isNotEmpty() }
+            val refreshKey = playlistIds.toSet()
+            val shouldAutoRefresh = (stored == 0 || noCurrentProgrammes) &&
+                refreshKey.isNotEmpty() && autoRefreshAttemptedFor != refreshKey
             val message = when {
                 stored == 0 -> null // handled by the "No EPG added" prompt (hasEpgSources=false)
                 channels.isEmpty() && q.isNotBlank() -> EpgMessage.NoChannelsForQuery(q)
@@ -778,9 +783,27 @@ class EpgViewModel(
 
             _state.value = EpgUiState(
                 channels = channels, windowStart = windowStart, windowEnd = windowEnd, now = now,
-                loading = false, message = message, hasEpgSources = hasEpg, stats = stats, catchupCount = catchupCount,
+                loading = false, refreshing = shouldAutoRefresh, message = message, hasEpgSources = hasEpg, stats = stats, catchupCount = catchupCount,
                 favoriteCount = favoriteIds.size,
             )
+
+            // Self-heal a blank Live guide after a source switch or stale provider cache.
+            if (shouldAutoRefresh) {
+                autoRefreshAttemptedFor = refreshKey
+                runCatching {
+                    sourceRepository.observeSources(pid).first()
+                        .filter { it.id in playlistIds }
+                        .forEach { epgRepository.refresh(it) }
+                    epgSourceStore.getAll().forEach { epgRepository.refreshUrl(it.id, it.url, it.userAgent) }
+                }
+                cachedWindow = null
+                lastStored = -1
+                rowCache.clear()
+                shiftedRowCache.clear()
+                _state.value = _state.value.copy(refreshing = false)
+                load()
+                return@launch
+            }
 
             // Pass 2 (background): merge the catch-up lookback into rowCache gradually, so a multi-day × many-
             // channel window never blocks the open or spikes memory on low-RAM (1.8 GB) boxes. Only runs when

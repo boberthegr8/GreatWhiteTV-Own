@@ -1,6 +1,12 @@
 package tv.own.owntv.features.epg
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.ui.geometry.CornerRadius
@@ -21,6 +27,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,6 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
@@ -389,12 +397,6 @@ fun EpgScreen(
                 sortGuide == SettingsRepository.GuideSort.FAVORITES && state.favoriteCount == 0 -> guideSortLabel(SettingsRepository.GuideSort.LIVE_TV)
                 else -> guideSortLabel(sortGuide)
             }
-            // Category filter (#8): narrow the guide to one group instead of all channels at once.
-            if (guideCategories.isNotEmpty()) {
-                val catLabel = categoryFilter?.let { key -> guideCategories.firstOrNull { it.key == key }?.name } ?: stringResource(R.string.content_epg_all)
-                OwnTVButton(stringResource(R.string.content_epg_category_button, catLabel), onClick = { showCategoryPicker = true }, icon = OwnTVIcon.MENU, style = OwnTVButtonStyle.SECONDARY)
-                Spacer(Modifier.width(12.dp))
-            }
             OwnTVButton(stringResource(R.string.content_epg_sort_button, sortLabel), onClick = { showSortPicker = true }, icon = OwnTVIcon.SORT, style = OwnTVButtonStyle.SECONDARY)
             Spacer(Modifier.width(12.dp))
             // Smart-match: auto-link channels whose tvg-id doesn't match the EPG feed, by name (#13).
@@ -485,6 +487,7 @@ fun EpgScreen(
                                 onTune = { vm.noteChannelTuned(channel); onPlayChannel(channel, state.channels) },
                                 onOpen = { restoreChannelId = channel.id; detail = channel to it },
                                 onMatchEpg = { restoreChannelId = channel.id; matchChooser = channel },
+                                onOpenCategories = { showCategoryPicker = true },
                                 inCellMode = inCellMode,
                                 cursorTime = cursorTime,
                                 onEnterCell = { cursorTime = state.now; inCellMode = true },
@@ -616,6 +619,93 @@ fun EpgScreen(
             onDismiss = { showCategoryPicker = false },
             searchable = true,
         )
+    }
+}
+
+
+@Composable
+private fun GuideCategoryRail(
+    categories: List<GuideCategory>,
+    selectedKey: String?,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    val scope = rememberCoroutineScope()
+    val visibleState = remember { MutableTransitionState(false).apply { targetState = true } }
+    val firstFocus = remember { FocusRequester() }
+
+    fun close(after: (() -> Unit)? = null) {
+        visibleState.targetState = false
+        scope.launch {
+            kotlinx.coroutines.delay(180)
+            after?.invoke()
+            onDismiss()
+        }
+    }
+
+    BackHandler { close() }
+    Popup(
+        alignment = Alignment.CenterStart,
+        onDismissRequest = { close() },
+        properties = PopupProperties(focusable = true),
+    ) {
+        Box(
+            Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.32f))
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    if (event.key == Key.DirectionRight) { close(); true } else false
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            AnimatedVisibility(
+                visibleState = visibleState,
+                enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
+            ) {
+                Column(
+                    Modifier.width(320.dp).fillMaxHeight()
+                        .background(colors.surfaceContainerHigh)
+                        .padding(horizontal = 16.dp, vertical = 22.dp)
+                        .focusGroup(),
+                ) {
+                    Text(stringResource(R.string.content_epg_guide_category), style = MaterialTheme.typography.headlineSmall, color = colors.onSurface)
+                    Spacer(Modifier.height(14.dp))
+                    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        item(key = Long.MIN_VALUE) {
+                            FocusableSurface(
+                                onClick = { close { onSelect(null) } },
+                                modifier = Modifier.fillMaxWidth().focusRequester(firstFocus),
+                                shape = RoundedCornerShape(10.dp),
+                                unfocusedContainerColor = if (selectedKey == null) colors.primaryContainer.copy(alpha = 0.35f) else colors.surface,
+                                contentAlignment = Alignment.CenterStart,
+                                surface = GlassSurface.CARDS,
+                            ) { focused ->
+                                Text(stringResource(R.string.content_epg_all_categories), modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = if (focused || selectedKey == null) colors.primary else colors.onSurface, style = MaterialTheme.typography.titleSmall)
+                            }
+                        }
+                        items(categories, key = { it.key }) { category ->
+                            val selected = category.key == selectedKey
+                            FocusableSurface(
+                                onClick = { close { onSelect(category.key) } },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                unfocusedContainerColor = if (selected) colors.primaryContainer.copy(alpha = 0.35f) else colors.surface,
+                                contentAlignment = Alignment.CenterStart,
+                                surface = GlassSurface.CARDS,
+                            ) { focused ->
+                                Text(category.name, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = if (focused || selected) colors.primary else colors.onSurface, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(70)
+        runCatching { firstFocus.requestFocus() }
     }
 }
 
@@ -775,6 +865,7 @@ private fun GuideChannelRow(
     onTune: () -> Unit,
     onOpen: (EpgProgrammeEntity) -> Unit,
     onMatchEpg: () -> Unit,
+    onOpenCategories: () -> Unit,
     inCellMode: Boolean,
     cursorTime: Long,
     onEnterCell: () -> Unit,
@@ -806,6 +897,12 @@ private fun GuideChannelRow(
                 .then(if (labelFocus != null) Modifier.focusRequester(labelFocus) else Modifier)
                 // Physical by design: the guide is an LTR timeline, so the strip is always right.
                 .focusProperties { right = stripFR }
+                .onKeyEvent { keyEvent ->
+                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
+                        onOpenCategories()
+                        true
+                    } else false
+                }
                 .onFocusChanged { if (it.isFocused) onExitToChannels() }, // back on a label ⇒ leave CELL stage
             shape = RoundedCornerShape(10.dp),
             unfocusedContainerColor = colors.surfaceContainerHigh,
