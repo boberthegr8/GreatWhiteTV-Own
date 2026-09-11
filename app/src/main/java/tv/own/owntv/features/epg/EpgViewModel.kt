@@ -137,7 +137,11 @@ class EpgViewModel(
 
     /** Live playlist switcher used by the cable-style guide. */
     val liveSources = activeProfileSources(settings, sourceDao)
-        .map { aps -> aps.sources.filter { it.syncLive && it.id in aps.liveSourceIds } }
+        .map { aps ->
+            aps.sources
+                .filter { it.syncLive && it.id in aps.liveSourceIds }
+                .sortedBy { it.name.lowercase() }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Negative id = All Playlists; a positive id narrows Live TV and Guide to one source. */
@@ -312,6 +316,11 @@ class EpgViewModel(
             val cur = modes.indexOf(sortGuide.value).let { if (it < 0) 0 else it }
             settings.setSortGuide(modes[(cur + 1) % modes.size])
         }
+    }
+
+    /** Set the guide ordering directly from the cable-style sort picker. */
+    fun setGuideSort(mode: SettingsRepository.GuideSort) {
+        viewModelScope.launch { settings.setSortGuide(mode) }
     }
 
     fun setQuery(q: String) {
@@ -665,6 +674,9 @@ class EpgViewModel(
             val favoriteIds = favoriteDao.observeFavoriteIds(pid, MediaType.LIVE).first().toSet()
             val sortLiveMode = settings.sortLive.first()
             val sortGuideMode = settings.sortGuide.first()
+            // Playlist sort is user-facing, so group by playlist NAME rather than an internal DB id.
+            val sourceNameById = sourceRepository.observeSources(pid).first()
+                .associate { it.id to it.name.lowercase() }
             // Hidden categories keep their channels out of the guide too (parity with Live TV), and a
             // filter pointing at a now-hidden category falls back to "All" instead of an empty grid.
         val isKidsProfile = profileDao.getById(pid)?.isKids == true
@@ -694,7 +706,11 @@ class EpgViewModel(
                 // Order the guide by its own sort. LIVE_TV mirrors the Live sort; CATCHUP floats archive
                 // channels to the top; ALPHA/PROVIDER are explicit. CATCHUP with none available falls to LIVE_TV.
                 val byAlpha = compareBy<ChannelEntity> { it.name.lowercase() }
-                val byProvider = compareBy<ChannelEntity>({ it.sourceId }, { it.sortOrder }, { it.name.lowercase() })
+                val byProvider = compareBy<ChannelEntity>(
+                    { sourceNameById[it.sourceId].orEmpty() },
+                    { it.sortOrder },
+                    { it.name.lowercase() },
+                )
                 val liveOrdered = when (sortLiveMode) {
                     SettingsRepository.SortMode.ALPHA -> matched.sortedWith(byAlpha)
                     // Live/EPG have no rating; RATING can't be selected there, so treat it as provider order.

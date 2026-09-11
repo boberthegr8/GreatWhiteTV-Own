@@ -546,8 +546,8 @@
     <string name="content_epg_all">All</string>
     <!-- Translators: Sort option for alphabetical order in the EPG channel list. -->
     <string name="content_epg_sort_alpha">A\u2013Z</string>
-    <!-- Translators: Sort option to sort EPG channels by provider. -->
-    <string name="content_epg_sort_provider">Provider</string>
+    <!-- Translators: Sort option to group EPG channels by playlist/source. -->
+    <string name="content_epg_sort_provider">Playlist</string>
     <!-- Translators: Sort option to sort EPG channels by live TV availability. -->
     <string name="content_epg_sort_live">Live TV</string>
     <!-- Translators: Sort option to sort EPG channels by catch-up availability. -->

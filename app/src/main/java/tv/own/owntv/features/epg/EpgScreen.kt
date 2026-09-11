@@ -202,6 +202,7 @@ fun EpgScreen(
     val catchupPlayer by vm.catchupPlayer.collectAsStateWithLifecycle()
     var showCategoryPicker by remember { mutableStateOf(false) }
     var showSourcePicker by remember { mutableStateOf(false) }
+    var showSortPicker by remember { mutableStateOf(false) }
     val colors = OwnTVTheme.colors
     val hScroll = rememberScrollState()
     val rowListState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -394,7 +395,7 @@ fun EpgScreen(
                 OwnTVButton(stringResource(R.string.content_epg_category_button, catLabel), onClick = { showCategoryPicker = true }, icon = OwnTVIcon.MENU, style = OwnTVButtonStyle.SECONDARY)
                 Spacer(Modifier.width(12.dp))
             }
-            OwnTVButton(stringResource(R.string.content_epg_sort_button, sortLabel), onClick = vm::cycleGuideSort, icon = OwnTVIcon.SORT, style = OwnTVButtonStyle.SECONDARY)
+            OwnTVButton(stringResource(R.string.content_epg_sort_button, sortLabel), onClick = { showSortPicker = true }, icon = OwnTVIcon.SORT, style = OwnTVButtonStyle.SECONDARY)
             Spacer(Modifier.width(12.dp))
             // Smart-match: auto-link channels whose tvg-id doesn't match the EPG feed, by name (#13).
             if (matching) {
@@ -586,6 +587,23 @@ fun EpgScreen(
             },
             onDismiss = { showSourcePicker = false },
             searchable = liveSources.size > 8,
+        )
+    }
+
+    if (showSortPicker) {
+        val sortModes = SettingsRepository.GuideSort.entries
+            .filter { it != SettingsRepository.GuideSort.CATCHUP || state.catchupCount > 0 }
+            .filter { it != SettingsRepository.GuideSort.FAVORITES || state.favoriteCount > 0 }
+        tv.own.owntv.features.settings.PickerDialog(
+            title = stringResource(R.string.content_sorting),
+            options = sortModes.map { it.name to guideSortLabel(it) },
+            selected = sortGuide.name,
+            onSelect = { value ->
+                SettingsRepository.GuideSort.entries.firstOrNull { it.name == value }?.let(vm::setGuideSort)
+                showSortPicker = false
+            },
+            onDismiss = { showSortPicker = false },
+            searchable = false,
         )
     }
 
