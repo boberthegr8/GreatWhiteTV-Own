@@ -1,0 +1,66 @@
+name: GWS v1.0.21 EPG Rail Run
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/GWS_V121_EPG_RAIL_RUN_TRIGGER'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Apply v1.0.21 patch
+        run: |
+          set -euo pipefail
+          python3 scripts/gws_v121_epg_rail_patch.py
+
+      - name: Verify v1.0.21 invariants
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < GWS_VERSION)" = '1.0.21'
+          grep -Fq 'groupBy { it.epgChannelId.trim().lowercase() }' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'shouldAutoRefresh' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'private fun GuideCategoryRail(' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'slideInHorizontally' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'onOpenCategories' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'versionCode = 10021' app/build.gradle.kts
+          grep -Fq 'versionName = "1.0.21"' app/build.gradle.kts
+
+      - name: Run unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testStandardDebugUnitTest --stacktrace
+
+      - name: Run lint
+        run: ./gradlew lintStandardDebug --stacktrace
+
+      - name: Commit v1.0.21 source
+        run: |
+          set -euo pipefail
+          git config user.name 'GWS Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add GWS_VERSION app/build.gradle.kts app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          git commit -m 'GWS v1.0.21 EPG recovery and sliding category rail'
+          git push origin HEAD:main
