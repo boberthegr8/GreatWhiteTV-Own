@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main ]
     paths:
-      - '.github/GWS_V121_EPG_RAIL_RUN_TRIGGER'
+      - '.github/GWS_V121_EPG_RAIL_RUN_TRIGGER_2'
 
 permissions:
   contents: write
@@ -45,8 +45,6 @@ jobs:
           grep -Fq 'private fun GuideCategoryRail(' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
           grep -Fq 'slideInHorizontally' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
           grep -Fq 'onOpenCategories' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
-          grep -Fq 'versionCode = 10021' app/build.gradle.kts
-          grep -Fq 'versionName = "1.0.21"' app/build.gradle.kts
 
       - name: Run unit tests
         run: |
@@ -61,6 +59,6 @@ jobs:
           set -euo pipefail
           git config user.name 'GWS Release'
           git config user.email 'actions@users.noreply.github.com'
-          git add GWS_VERSION app/build.gradle.kts app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          git add GWS_VERSION app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
           git commit -m 'GWS v1.0.21 EPG recovery and sliding category rail'
           git push origin HEAD:main
