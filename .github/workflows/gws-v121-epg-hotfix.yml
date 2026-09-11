@@ -1,0 +1,84 @@
+name: GWS v1.0.21 EPG Population Hotfix
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/GWS_V121_EPG_HOTFIX_TRIGGER'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Apply EPG population hotfix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt')
+          s=p.read_text()
+          s=s.replace(
+              'all.groupBy { it.epgChannelId }.mapValues { (_, v) -> v.sortedBy { it.startMs } }',
+              'all.groupBy { it.epgChannelId.trim().lowercase() }.mapValues { (_, v) -> v.sortedBy { it.startMs } }'
+          )
+          marker='    @Volatile private var lastStored = -1 // stored programme count the cache was built from (data-change guard)\n'
+          if 'autoRefreshAttemptedFor' not in s:
+              s=s.replace(marker, marker + '    @Volatile private var autoRefreshAttemptedFor: Set<Long> = emptySet()\n')
+          old='''            val hasEpg = epgIds.isNotEmpty()\n            val message = when {\n'''
+          new='''            val hasEpg = stored > 0 || epgIds.isNotEmpty()\n            val noCurrentProgrammes = rowCache.values.none { it.isNotEmpty() }\n            val refreshKey = playlistIds.toSet()\n            val shouldAutoRefresh = (stored == 0 || noCurrentProgrammes) &&\n                refreshKey.isNotEmpty() && autoRefreshAttemptedFor != refreshKey\n            val message = when {\n'''
+          if old not in s:
+              raise SystemExit('hasEpg marker not found')
+          s=s.replace(old,new)
+          old2='''            _state.value = EpgUiState(\n                channels = channels, windowStart = windowStart, windowEnd = windowEnd, now = now,\n                loading = false, message = message, hasEpgSources = hasEpg, stats = stats, catchupCount = catchupCount,\n                favoriteCount = favoriteIds.size,\n            )\n\n            // Pass 2 (background): merge the catch-up lookback into rowCache gradually, so a multi-day × many-\n'''
+          new2='''            _state.value = EpgUiState(\n                channels = channels, windowStart = windowStart, windowEnd = windowEnd, now = now,\n                loading = false, refreshing = shouldAutoRefresh, message = message, hasEpgSources = hasEpg, stats = stats, catchupCount = catchupCount,\n                favoriteCount = favoriteIds.size,\n            )\n\n            // If Live TV has no current schedule after a source switch/update, recover automatically.\n            // The selected playlist controls which CHANNELS are visible; guide refresh still pulls the\n            // provider's native EPG plus any configured XMLTV sources. One attempt per source set avoids loops.\n            if (shouldAutoRefresh) {\n                autoRefreshAttemptedFor = refreshKey\n                runCatching {\n                    sourceRepository.observeSources(pid).first()\n                        .filter { it.id in playlistIds }\n                        .forEach { epgRepository.refresh(it) }\n                    epgSourceStore.getAll().forEach { epgRepository.refreshUrl(it.id, it.url, it.userAgent) }\n                }\n                cachedWindow = null\n                lastStored = -1\n                rowCache.clear()\n                shiftedRowCache.clear()\n                _state.value = _state.value.copy(refreshing = false)\n                load()\n                return@launch\n            }\n\n            // Pass 2 (background): merge the catch-up lookback into rowCache gradually, so a multi-day × many-\n'''
+          if old2 not in s:
+              raise SystemExit('state marker not found')
+          s=s.replace(old2,new2)
+          p.write_text(s)
+
+          # bump version
+          Path('GWS_VERSION').write_text('1.0.21\n')
+          b=Path('app/build.gradle.kts')
+          bs=b.read_text()
+          bs=bs.replace('versionCode = 10020','versionCode = 10021')
+          bs=bs.replace('versionName = "1.0.20"','versionName = "1.0.21"')
+          b.write_text(bs)
+          PY
+      - name: Verify hotfix invariants
+        run: |
+          set -euo pipefail
+          grep -Fq 'groupBy { it.epgChannelId.trim().lowercase() }' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'val shouldAutoRefresh' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'epgRepository.refresh(it)' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          test "$(tr -d '[:space:]' < GWS_VERSION)" = '1.0.21'
+          grep -Fq 'versionCode = 10021' app/build.gradle.kts
+          grep -Fq 'versionName = "1.0.21"' app/build.gradle.kts
+      - name: Run unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testStandardDebugUnitTest --stacktrace
+      - name: Run lint
+        run: ./gradlew lintStandardDebug --stacktrace
+      - name: Commit hotfix
+        run: |
+          git config user.name 'GWS Hotfix'
+          git config user.email 'actions@users.noreply.github.com'
+          git add app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/build.gradle.kts GWS_VERSION
+          git commit -m 'Fix empty EPG population and bump v1.0.21'
+          git push origin HEAD:main
