@@ -1,0 +1,135 @@
+name: GWS v1.0.20 EPG Playlist Sort Fixed
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/GWS_V120_EPG_SORT_FIXED_TRIGGER'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Apply corrected v1.0.20 EPG playlist sorting UX
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              s = p.read_text()
+              if new in s:
+                  return
+              if old not in s:
+                  raise SystemExit(f'{label} anchor not found')
+              p.write_text(s.replace(old, new, 1))
+
+          Path('GWS_VERSION').write_text('1.0.20\n')
+
+          replace_once(
+              'app/src/main/res/values/strings_content.xml',
+              '<!-- Translators: Sort option to sort EPG channels by provider. -->\n    <string name="content_epg_sort_provider">Provider</string>',
+              '<!-- Translators: Sort option to group EPG channels by playlist/source. -->\n    <string name="content_epg_sort_provider">Playlist</string>',
+              'EPG playlist label',
+          )
+
+          replace_once(
+              'app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt',
+              '''    val liveSources = activeProfileSources(settings, sourceDao)\n        .map { aps -> aps.sources.filter { it.syncLive && it.id in aps.liveSourceIds } }\n        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())''',
+              '''    val liveSources = activeProfileSources(settings, sourceDao)\n        .map { aps ->\n            aps.sources\n                .filter { it.syncLive && it.id in aps.liveSourceIds }\n                .sortedBy { it.name.lowercase() }\n        }\n        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())''',
+              'alphabetical source picker',
+          )
+
+          replace_once(
+              'app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt',
+              '''    fun cycleGuideSort() {\n        viewModelScope.launch {\n            val modes = SettingsRepository.GuideSort.entries\n                .filter { it != SettingsRepository.GuideSort.CATCHUP || _state.value.catchupCount > 0 }\n                .filter { it != SettingsRepository.GuideSort.FAVORITES || _state.value.favoriteCount > 0 }\n            val cur = modes.indexOf(sortGuide.value).let { if (it < 0) 0 else it }\n            settings.setSortGuide(modes[(cur + 1) % modes.size])\n        }\n    }''',
+              '''    fun cycleGuideSort() {\n        viewModelScope.launch {\n            val modes = SettingsRepository.GuideSort.entries\n                .filter { it != SettingsRepository.GuideSort.CATCHUP || _state.value.catchupCount > 0 }\n                .filter { it != SettingsRepository.GuideSort.FAVORITES || _state.value.favoriteCount > 0 }\n            val cur = modes.indexOf(sortGuide.value).let { if (it < 0) 0 else it }\n            settings.setSortGuide(modes[(cur + 1) % modes.size])\n        }\n    }\n\n    /** Set the guide ordering directly from the cable-style sort picker. */\n    fun setGuideSort(mode: SettingsRepository.GuideSort) {\n        viewModelScope.launch { settings.setSortGuide(mode) }\n    }''',
+              'direct sort setter',
+          )
+
+          replace_once(
+              'app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt',
+              '''            val sortLiveMode = settings.sortLive.first()\n            val sortGuideMode = settings.sortGuide.first()''',
+              '''            val sortLiveMode = settings.sortLive.first()\n            val sortGuideMode = settings.sortGuide.first()\n            // Playlist sort is user-facing, so group by playlist NAME rather than an internal DB id.\n            val sourceNameById = sourceRepository.observeSources(pid).first()\n                .associate { it.id to it.name.lowercase() }''',
+              'source name map',
+          )
+
+          replace_once(
+              'app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt',
+              '''                val byProvider = compareBy<ChannelEntity>({ it.sourceId }, { it.sortOrder }, { it.name.lowercase() })''',
+              '''                val byProvider = compareBy<ChannelEntity>(\n                    { sourceNameById[it.sourceId].orEmpty() },\n                    { it.sortOrder },\n                    { it.name.lowercase() },\n                )''',
+              'playlist name ordering',
+          )
+
+          replace_once(
+              'app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt',
+              '''    var showCategoryPicker by remember { mutableStateOf(false) }\n    var showSourcePicker by remember { mutableStateOf(false) }''',
+              '''    var showCategoryPicker by remember { mutableStateOf(false) }\n    var showSourcePicker by remember { mutableStateOf(false) }\n    var showSortPicker by remember { mutableStateOf(false) }''',
+              'sort picker state',
+          )
+
+          replace_once(
+              'app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt',
+              '''            OwnTVButton(stringResource(R.string.content_epg_sort_button, sortLabel), onClick = vm::cycleGuideSort, icon = OwnTVIcon.SORT, style = OwnTVButtonStyle.SECONDARY)''',
+              '''            OwnTVButton(stringResource(R.string.content_epg_sort_button, sortLabel), onClick = { showSortPicker = true }, icon = OwnTVIcon.SORT, style = OwnTVButtonStyle.SECONDARY)''',
+              'sort picker button',
+          )
+
+          replace_once(
+              'app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt',
+              '''    if (showCategoryPicker) {\n        tv.own.owntv.features.settings.PickerDialog(''',
+              '''    if (showSortPicker) {\n        val sortModes = SettingsRepository.GuideSort.entries\n            .filter { it != SettingsRepository.GuideSort.CATCHUP || state.catchupCount > 0 }\n            .filter { it != SettingsRepository.GuideSort.FAVORITES || state.favoriteCount > 0 }\n        tv.own.owntv.features.settings.PickerDialog(\n            title = stringResource(R.string.content_sorting),\n            options = sortModes.map { it.name to guideSortLabel(it) },\n            selected = sortGuide.name,\n            onSelect = { value ->\n                SettingsRepository.GuideSort.entries.firstOrNull { it.name == value }?.let(vm::setGuideSort)\n                showSortPicker = false\n            },\n            onDismiss = { showSortPicker = false },\n            searchable = false,\n        )\n    }\n\n    if (showCategoryPicker) {\n        tv.own.owntv.features.settings.PickerDialog(''',
+              'sort picker dialog',
+          )
+          PY
+
+      - name: Verify v1.0.20 invariants
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < GWS_VERSION)" = '1.0.20'
+          grep -Fq '<string name="content_epg_sort_provider">Playlist</string>' app/src/main/res/values/strings_content.xml
+          grep -Fq '.sortedBy { it.name.lowercase() }' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'sourceNameById[it.sourceId].orEmpty()' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'fun setGuideSort(mode: SettingsRepository.GuideSort)' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'var showSortPicker by remember' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'onClick = { showSortPicker = true }' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'selectedSection == MainSection.LIVE_TV -> EpgScreen(' app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt
+
+      - name: Run unit tests
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testStandardDebugUnitTest --stacktrace
+
+      - name: Run lint
+        run: ./gradlew lintStandardDebug --stacktrace
+
+      - name: Commit v1.0.20 source
+        run: |
+          set -euo pipefail
+          git config user.name 'GWS Release'
+          git config user.email 'actions@users.noreply.github.com'
+          git add GWS_VERSION app/src/main/res/values/strings_content.xml app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          git commit -m 'GWS v1.0.20 playlist sorting and EPG UX'
+          git push origin HEAD:main
