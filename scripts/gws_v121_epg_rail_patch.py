@@ -1,16 +1,5 @@
 from pathlib import Path
 
-
-def replace_once(path: str, old: str, new: str, label: str) -> None:
-    p = Path(path)
-    s = p.read_text()
-    if new in s:
-        return
-    if old not in s:
-        raise SystemExit(f"{label} anchor not found")
-    p.write_text(s.replace(old, new, 1))
-
-
 vm = Path("app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt")
 s = vm.read_text()
 s = s.replace(
@@ -86,6 +75,8 @@ if "import androidx.compose.animation.AnimatedVisibility" not in e:
     )
 if "import androidx.compose.foundation.layout.fillMaxHeight" not in e:
     e = e.replace("import androidx.compose.foundation.layout.fillMaxSize\n", "import androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxHeight\n", 1)
+if "import androidx.compose.foundation.lazy.items\n" not in e:
+    e = e.replace("import androidx.compose.foundation.lazy.itemsIndexed\n", "import androidx.compose.foundation.lazy.items\nimport androidx.compose.foundation.lazy.itemsIndexed\n", 1)
 
 top = """            // Category filter (#8): narrow the guide to one group instead of all channels at once.
             if (guideCategories.isNotEmpty()) {
@@ -96,33 +87,32 @@ top = """            // Category filter (#8): narrow the guide to one group inst
 """
 e = e.replace(top, "", 1)
 
-replace_anchor = """                                onMatchEpg = { restoreChannelId = channel.id; matchChooser = channel },
+call = """                                onMatchEpg = { restoreChannelId = channel.id; matchChooser = channel },
                                 inCellMode = inCellMode,
 """
-replace_value = """                                onMatchEpg = { restoreChannelId = channel.id; matchChooser = channel },
+if call in e:
+    e = e.replace(call, """                                onMatchEpg = { restoreChannelId = channel.id; matchChooser = channel },
                                 onOpenCategories = { showCategoryPicker = true },
                                 inCellMode = inCellMode,
-"""
-if replace_anchor in e:
-    e = e.replace(replace_anchor, replace_value, 1)
+""", 1)
 
 sig = """    onOpen: (EpgProgrammeEntity) -> Unit,
     onMatchEpg: () -> Unit,
     inCellMode: Boolean,
 """
-sig2 = """    onOpen: (EpgProgrammeEntity) -> Unit,
+if sig in e:
+    e = e.replace(sig, """    onOpen: (EpgProgrammeEntity) -> Unit,
     onMatchEpg: () -> Unit,
     onOpenCategories: () -> Unit,
     inCellMode: Boolean,
-"""
-if sig in e:
-    e = e.replace(sig, sig2, 1)
+""", 1)
 
 label = """                // Physical by design: the guide is an LTR timeline, so the strip is always right.
                 .focusProperties { right = stripFR }
                 .onFocusChanged { if (it.isFocused) onExitToChannels() }, // back on a label ⇒ leave CELL stage
 """
-label2 = """                // Physical by design: the guide is an LTR timeline, so the strip is always right.
+if label in e:
+    e = e.replace(label, """                // Physical by design: the guide is an LTR timeline, so the strip is always right.
                 .focusProperties { right = stripFR }
                 .onKeyEvent { keyEvent ->
                     if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {
@@ -131,9 +121,7 @@ label2 = """                // Physical by design: the guide is an LTR timeline,
                     } else false
                 }
                 .onFocusChanged { if (it.isFocused) onExitToChannels() }, // back on a label ⇒ leave CELL stage
-"""
-if label in e:
-    e = e.replace(label, label2, 1)
+""", 1)
 
 old_picker = """    if (showCategoryPicker) {
         tv.own.owntv.features.settings.PickerDialog(
@@ -146,7 +134,8 @@ old_picker = """    if (showCategoryPicker) {
         )
     }
 """
-new_picker = """    if (showCategoryPicker) {
+if old_picker in e:
+    e = e.replace(old_picker, """    if (showCategoryPicker) {
         GuideCategoryRail(
             categories = guideCategories,
             selectedKey = categoryFilter,
@@ -154,9 +143,7 @@ new_picker = """    if (showCategoryPicker) {
             onDismiss = { showCategoryPicker = false },
         )
     }
-"""
-if old_picker in e:
-    e = e.replace(old_picker, new_picker, 1)
+""", 1)
 
 insert_before = "/**\n * Review screen for the smart EPG matcher (#13): lists the lower-confidence suggestions the auto-match\n"
 rail = r'''
@@ -192,10 +179,7 @@ private fun GuideCategoryRail(
                 .background(Color.Black.copy(alpha = 0.32f))
                 .onKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                    when (event.key) {
-                        Key.DirectionRight -> { close(); true }
-                        else -> false
-                    }
+                    if (event.key == Key.DirectionRight) { close(); true } else false
                 },
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -210,16 +194,9 @@ private fun GuideCategoryRail(
                         .padding(horizontal = 16.dp, vertical = 22.dp)
                         .focusGroup(),
                 ) {
-                    Text(
-                        stringResource(R.string.content_epg_guide_category),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = colors.onSurface,
-                    )
+                    Text(stringResource(R.string.content_epg_guide_category), style = MaterialTheme.typography.headlineSmall, color = colors.onSurface)
                     Spacer(Modifier.height(14.dp))
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
+                    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         item(key = "ALL") {
                             FocusableSurface(
                                 onClick = { close { onSelect(null) } },
@@ -229,12 +206,7 @@ private fun GuideCategoryRail(
                                 contentAlignment = Alignment.CenterStart,
                                 surface = GlassSurface.CARDS,
                             ) { focused ->
-                                Text(
-                                    stringResource(R.string.content_epg_all_categories),
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                    color = if (focused || selectedKey == null) colors.primary else colors.onSurface,
-                                    style = MaterialTheme.typography.titleSmall,
-                                )
+                                Text(stringResource(R.string.content_epg_all_categories), modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = if (focused || selectedKey == null) colors.primary else colors.onSurface, style = MaterialTheme.typography.titleSmall)
                             }
                         }
                         items(categories, key = { it.key }) { category ->
@@ -247,14 +219,7 @@ private fun GuideCategoryRail(
                                 contentAlignment = Alignment.CenterStart,
                                 surface = GlassSurface.CARDS,
                             ) { focused ->
-                                Text(
-                                    category.name,
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                    color = if (focused || selected) colors.primary else colors.onSurface,
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                                Text(category.name, modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = if (focused || selected) colors.primary else colors.onSurface, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -275,8 +240,4 @@ if "private fun GuideCategoryRail(" not in e:
     e = e.replace(insert_before, rail + insert_before, 1)
 
 screen.write_text(e)
-
 Path("GWS_VERSION").write_text("1.0.21\n")
-build = Path("app/build.gradle.kts")
-bs = build.read_text().replace("versionCode = 10020", "versionCode = 10021").replace('versionName = "1.0.20"', 'versionName = "1.0.21"')
-build.write_text(bs)
