@@ -1,0 +1,226 @@
+name: GWS v1.0.21 EPG Recovery + Category Rail
+
+on:
+  push:
+    paths:
+      - '.github/GWS_V121_EPG_RAIL_TRIGGER'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Apply EPG recovery and category rail
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          vm = Path('app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt')
+          s = vm.read_text()
+          s = s.replace(
+              'all.groupBy { it.epgChannelId }.mapValues { (_, v) -> v.sortedBy { it.startMs } }',
+              'all.groupBy { it.epgChannelId.trim().lowercase() }.mapValues { (_, v) -> v.sortedBy { it.startMs } }'
+          )
+          marker = '    @Volatile private var lastStored = -1 // stored programme count the cache was built from (data-change guard)\n'
+          if 'autoRefreshAttemptedFor' not in s:
+              assert marker in s
+              s = s.replace(marker, marker + '    @Volatile private var autoRefreshAttemptedFor: Set<Long> = emptySet()\n')
+          old = '            val hasEpg = epgIds.isNotEmpty()\n            val message = when {\n'
+          new = '''            val hasEpg = stored > 0 || epgIds.isNotEmpty()\n            val noCurrentProgrammes = rowCache.values.none { it.isNotEmpty() }\n            val refreshKey = playlistIds.toSet()\n            val shouldAutoRefresh = (stored == 0 || noCurrentProgrammes) &&\n                refreshKey.isNotEmpty() && autoRefreshAttemptedFor != refreshKey\n            val message = when {\n'''
+          if old in s:
+              s = s.replace(old, new)
+          old2 = '''            _state.value = EpgUiState(\n                channels = channels, windowStart = windowStart, windowEnd = windowEnd, now = now,\n                loading = false, message = message, hasEpgSources = hasEpg, stats = stats, catchupCount = catchupCount,\n                favoriteCount = favoriteIds.size,\n            )\n\n            // Pass 2 (background): merge the catch-up lookback into rowCache gradually, so a multi-day × many-\n'''
+          new2 = '''            _state.value = EpgUiState(\n                channels = channels, windowStart = windowStart, windowEnd = windowEnd, now = now,\n                loading = false, refreshing = shouldAutoRefresh, message = message, hasEpgSources = hasEpg, stats = stats, catchupCount = catchupCount,\n                favoriteCount = favoriteIds.size,\n            )\n\n            // Self-heal a blank Live guide after a source switch or stale provider cache.\n            if (shouldAutoRefresh) {\n                autoRefreshAttemptedFor = refreshKey\n                runCatching {\n                    sourceRepository.observeSources(pid).first()\n                        .filter { it.id in playlistIds }\n                        .forEach { epgRepository.refresh(it) }\n                    epgSourceStore.getAll().forEach { epgRepository.refreshUrl(it.id, it.url, it.userAgent) }\n                }\n                cachedWindow = null\n                lastStored = -1\n                rowCache.clear()\n                shiftedRowCache.clear()\n                _state.value = _state.value.copy(refreshing = false)\n                load()\n                return@launch\n            }\n\n            // Pass 2 (background): merge the catch-up lookback into rowCache gradually, so a multi-day × many-\n'''
+          if old2 in s:
+              s = s.replace(old2, new2)
+          vm.write_text(s)
+
+          p = Path('app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt')
+          e = p.read_text()
+          imports = '''import androidx.compose.animation.AnimatedVisibility\nimport androidx.compose.animation.core.MutableTransitionState\nimport androidx.compose.animation.fadeIn\nimport androidx.compose.animation.fadeOut\nimport androidx.compose.animation.slideInHorizontally\nimport androidx.compose.animation.slideOutHorizontally\n'''
+          if 'import androidx.compose.animation.AnimatedVisibility' not in e:
+              e = e.replace('import androidx.activity.compose.BackHandler\n', 'import androidx.activity.compose.BackHandler\n' + imports)
+          if 'import androidx.compose.foundation.layout.fillMaxHeight' not in e:
+              e = e.replace('import androidx.compose.foundation.layout.fillMaxSize\n', 'import androidx.compose.foundation.layout.fillMaxSize\nimport androidx.compose.foundation.layout.fillMaxHeight\n')
+
+          # Remove the top-bar category button: groups now live in the sliding left rail.
+          top = '''            // Category filter (#8): narrow the guide to one group instead of all channels at once.\n            if (guideCategories.isNotEmpty()) {\n                val catLabel = categoryFilter?.let { key -> guideCategories.firstOrNull { it.key == key }?.name } ?: stringResource(R.string.content_epg_all)\n                OwnTVButton(stringResource(R.string.content_epg_category_button, catLabel), onClick = { showCategoryPicker = true }, icon = OwnTVIcon.MENU, style = OwnTVButtonStyle.SECONDARY)\n                Spacer(Modifier.width(12.dp))\n            }\n'''
+          e = e.replace(top, '')
+
+          # Pass a callback into every guide row so LEFT on the pinned channel label opens groups.
+          call = '''                                onMatchEpg = { restoreChannelId = channel.id; matchChooser = channel },\n                                inCellMode = inCellMode,\n'''
+          repl = '''                                onMatchEpg = { restoreChannelId = channel.id; matchChooser = channel },\n                                onOpenCategories = { showCategoryPicker = true },\n                                inCellMode = inCellMode,\n'''
+          assert call in e
+          e = e.replace(call, repl)
+
+          sig = '''    onOpen: (EpgProgrammeEntity) -> Unit,\n    onMatchEpg: () -> Unit,\n    inCellMode: Boolean,\n'''
+          sig2 = '''    onOpen: (EpgProgrammeEntity) -> Unit,\n    onMatchEpg: () -> Unit,\n    onOpenCategories: () -> Unit,\n    inCellMode: Boolean,\n'''
+          assert sig in e
+          e = e.replace(sig, sig2)
+
+          label = '''                // Physical by design: the guide is an LTR timeline, so the strip is always right.\n                .focusProperties { right = stripFR }\n                .onFocusChanged { if (it.isFocused) onExitToChannels() }, // back on a label ⇒ leave CELL stage\n'''
+          label2 = '''                // Physical by design: the guide is an LTR timeline, so the strip is always right.\n                .focusProperties { right = stripFR }\n                .onKeyEvent { keyEvent ->\n                    if (keyEvent.type == KeyEventType.KeyDown && keyEvent.key == Key.DirectionLeft) {\n                        onOpenCategories()\n                        true\n                    } else false\n                }\n                .onFocusChanged { if (it.isFocused) onExitToChannels() }, // back on a label ⇒ leave CELL stage\n'''
+          assert label in e
+          e = e.replace(label, label2)
+
+          old_picker = '''    if (showCategoryPicker) {\n        tv.own.owntv.features.settings.PickerDialog(\n            title = stringResource(R.string.content_epg_guide_category),\n            options = listOf("ALL" to stringResource(R.string.content_epg_all_categories)) + guideCategories.map { it.key to it.name },\n            selected = categoryFilter ?: "ALL",\n            onSelect = { vm.setCategoryFilter(it.takeUnless { value -> value == "ALL" }); showCategoryPicker = false },\n            onDismiss = { showCategoryPicker = false },\n            searchable = guideCategories.size > 8,\n        )\n    }\n'''
+          new_picker = '''    if (showCategoryPicker) {\n        GuideCategoryRail(\n            categories = guideCategories,\n            selectedKey = categoryFilter,\n            onSelect = { key -> vm.setCategoryFilter(key); showCategoryPicker = false },\n            onDismiss = { showCategoryPicker = false },\n        )\n    }\n'''
+          assert old_picker in e
+          e = e.replace(old_picker, new_picker)
+
+          insert_before = '/**\n * Review screen for the smart EPG matcher (#13): lists the lower-confidence suggestions the auto-match\n'
+          rail = r'''
+@Composable
+private fun GuideCategoryRail(
+    categories: List<GuideCategory>,
+    selectedKey: String?,
+    onSelect: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = OwnTVTheme.colors
+    val scope = rememberCoroutineScope()
+    val visibleState = remember { MutableTransitionState(false).apply { targetState = true } }
+    val firstFocus = remember { FocusRequester() }
+
+    fun close(after: (() -> Unit)? = null) {
+        visibleState.targetState = false
+        scope.launch {
+            kotlinx.coroutines.delay(180)
+            after?.invoke()
+            onDismiss()
+        }
+    }
+
+    BackHandler { close() }
+    Popup(
+        alignment = Alignment.CenterStart,
+        onDismissRequest = { close() },
+        properties = PopupProperties(focusable = true),
+    ) {
+        Box(
+            Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.32f))
+                .onKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                    when (event.key) {
+                        Key.DirectionRight -> { close(); true }
+                        else -> false
+                    }
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            AnimatedVisibility(
+                visibleState = visibleState,
+                enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
+            ) {
+                Column(
+                    Modifier.width(320.dp).fillMaxHeight()
+                        .background(colors.surfaceContainerHigh)
+                        .padding(horizontal = 16.dp, vertical = 22.dp)
+                        .focusGroup(),
+                ) {
+                    Text(
+                        stringResource(R.string.content_epg_guide_category),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.onSurface,
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        item(key = "ALL") {
+                            FocusableSurface(
+                                onClick = { close { onSelect(null) } },
+                                modifier = Modifier.fillMaxWidth().focusRequester(firstFocus),
+                                shape = RoundedCornerShape(10.dp),
+                                unfocusedContainerColor = if (selectedKey == null) colors.primaryContainer.copy(alpha = 0.35f) else colors.surface,
+                                contentAlignment = Alignment.CenterStart,
+                                surface = GlassSurface.CARDS,
+                            ) { focused ->
+                                Text(
+                                    stringResource(R.string.content_epg_all_categories),
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    color = if (focused || selectedKey == null) colors.primary else colors.onSurface,
+                                    style = MaterialTheme.typography.titleSmall,
+                                )
+                            }
+                        }
+                        items(categories, key = { it.key }) { category ->
+                            val selected = category.key == selectedKey
+                            FocusableSurface(
+                                onClick = { close { onSelect(category.key) } },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                unfocusedContainerColor = if (selected) colors.primaryContainer.copy(alpha = 0.35f) else colors.surface,
+                                contentAlignment = Alignment.CenterStart,
+                                surface = GlassSurface.CARDS,
+                            ) { focused ->
+                                Text(
+                                    category.name,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    color = if (focused || selected) colors.primary else colors.onSurface,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(70)
+        runCatching { firstFocus.requestFocus() }
+    }
+}
+
+'''
+          assert insert_before in e
+          e = e.replace(insert_before, rail + insert_before)
+          p.write_text(e)
+
+          Path('GWS_VERSION').write_text('1.0.21\n')
+          b = Path('app/build.gradle.kts')
+          bs = b.read_text().replace('versionCode = 10020', 'versionCode = 10021').replace('versionName = "1.0.20"', 'versionName = "1.0.21"')
+          b.write_text(bs)
+          PY
+      - name: Verify invariants
+        run: |
+          set -euo pipefail
+          grep -Fq 'groupBy { it.epgChannelId.trim().lowercase() }' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'shouldAutoRefresh' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -Fq 'GuideCategoryRail(' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'slideInHorizontally' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -Fq 'onOpenCategories' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          test "$(tr -d '[:space:]' < GWS_VERSION)" = '1.0.21'
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+      - name: Run lint
+        run: ./gradlew lintDebug --no-daemon
+      - name: Commit v1.0.21
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt app/build.gradle.kts GWS_VERSION
+          git commit -m 'Fix EPG population and add sliding category rail'
+          git push origin main
