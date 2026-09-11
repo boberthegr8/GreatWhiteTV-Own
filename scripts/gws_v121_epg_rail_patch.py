@@ -197,7 +197,7 @@ private fun GuideCategoryRail(
                     Text(stringResource(R.string.content_epg_guide_category), style = MaterialTheme.typography.headlineSmall, color = colors.onSurface)
                     Spacer(Modifier.height(14.dp))
                     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        item(key = "ALL") {
+                        item(key = Long.MIN_VALUE) {
                             FocusableSurface(
                                 onClick = { close { onSelect(null) } },
                                 modifier = Modifier.fillMaxWidth().focusRequester(firstFocus),
