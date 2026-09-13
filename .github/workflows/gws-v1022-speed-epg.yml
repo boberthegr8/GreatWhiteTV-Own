@@ -1,0 +1,63 @@
+name: GWS v1.0.22 Speed + Full EPG Sync
+on:
+  push:
+    paths: ['.github/GWS_V1022_SPEED_TRIGGER']
+permissions:
+  contents: write
+jobs:
+  patch-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '21' }
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Patch v1.0.22
+        shell: python
+        run: |
+          from pathlib import Path
+          vm=Path('app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt')
+          s=vm.read_text()
+          anchor='''    private suspend fun refreshAllEpgFromNetwork() {\n        val pid = settings.activeProfileId.first()\n        if (pid >= 0) sourceRepository.observeSources(pid).first().forEach { runCatching { epgRepository.refresh(it) } }\n        epgSourceStore.getAll().forEach { runCatching { epgRepository.refreshUrl(it.id, it.url, it.userAgent) } }\n    }'''
+          repl=anchor+'''\n\n    /** User-requested full guide sync. Deliberately ignores the current playlist/category filter:\n     * every Live playlist with a guide plus every standalone XMLTV source is refreshed. */\n    fun syncAllEpg() {\n        if (_state.value.refreshing) return\n        viewModelScope.launch {\n            _state.value = _state.value.copy(refreshing = true)\n            try {\n                refreshAllEpgFromNetwork()\n                autoRefreshAttemptedFor = emptySet()\n                cachedWindow = null\n                lastStored = -1\n                rowCache.clear()\n                shiftedRowCache.clear()\n                _cacheRevision.value++\n            } finally {\n                _state.value = _state.value.copy(refreshing = false)\n            }\n            load()\n        }\n    }'''
+          assert anchor in s
+          vm.write_text(s.replace(anchor,repl))
+
+          ui=Path('app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt')
+          s=ui.read_text()
+          old='''            Spacer(Modifier.weight(1f))\n            // Guide sort: A–Z / Provider / Live TV (mirrors Live) / Catch-up (archive first; hidden when none).'''
+          new='''            Spacer(Modifier.weight(1f))\n            if (state.refreshing) {\n                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                    OwnTVSpinner(sizeDp = 18)\n                    Text(stringResource(R.string.content_epg_syncing_all), style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant)\n                }\n            } else {\n                OwnTVButton(stringResource(R.string.content_epg_sync_all), onClick = vm::syncAllEpg, icon = OwnTVIcon.EPG, style = OwnTVButtonStyle.SECONDARY)\n            }\n            // Guide sort: A–Z / Provider / Live TV (mirrors Live) / Catch-up (archive first; hidden when none).'''
+          assert old in s
+          s=s.replace(old,new)
+          oldpicker='''    if (showCategoryPicker) {\n        tv.own.owntv.features.settings.PickerDialog(\n            title = stringResource(R.string.content_epg_guide_category),\n            options = listOf("ALL" to stringResource(R.string.content_epg_all_categories)) + guideCategories.map { it.key to it.name },\n            selected = categoryFilter ?: "ALL",\n            onSelect = { vm.setCategoryFilter(it.takeUnless { value -> value == "ALL" }); showCategoryPicker = false },\n            onDismiss = { showCategoryPicker = false },\n            searchable = true,\n        )\n    }'''
+          newpicker='''    if (showCategoryPicker) {\n        GuideCategoryRail(\n            categories = guideCategories,\n            selectedKey = categoryFilter,\n            onSelect = vm::setCategoryFilter,\n            onDismiss = { showCategoryPicker = false },\n        )\n    }'''
+          assert oldpicker in s
+          ui.write_text(s.replace(oldpicker,newpicker))
+
+          st=Path('app/src/main/res/values/strings.xml')
+          s=st.read_text()
+          marker='</resources>'
+          add='''    <!-- Translators: Refreshes EPG data for every Live TV playlist and standalone guide source. -->\n    <string name="content_epg_sync_all">Sync all EPG</string>\n    <!-- Translators: Status while all guide sources are being refreshed. -->\n    <string name="content_epg_syncing_all">Syncing all EPG…</string>\n'''
+          assert marker in s
+          st.write_text(s.replace(marker,add+marker))
+          Path('GWS_VERSION').write_text('1.0.22\n')
+      - name: Verify invariants
+        run: |
+          grep -q 'fun syncAllEpg()' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -q 'refreshAllEpgFromNetwork()' app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt
+          grep -q 'GuideCategoryRail(' app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt
+          grep -q 'content_epg_sync_all' app/src/main/res/values/strings.xml
+          test "$(tr -d '\r\n' < GWS_VERSION)" = '1.0.22'
+      - name: Unit tests
+        run: ./gradlew testStandardDebugUnitTest --no-daemon
+      - name: Lint
+        run: ./gradlew lintStandardDebug --no-daemon
+      - name: Commit source
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt app/src/main/java/tv/own/owntv/features/epg/EpgScreen.kt app/src/main/res/values/strings.xml GWS_VERSION
+          git commit -m 'GWS v1.0.22: speed-first EPG sync and category rail'
+          git push origin HEAD:main
