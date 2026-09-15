@@ -110,10 +110,12 @@ jobs:
           set -euo pipefail
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
           test -x "$APKSIGNER"
-          "$APKSIGNER" verify --verbose --print-certs "$ARM_SRC"
+          CERT_OUTPUT=$("$APKSIGNER" verify --verbose --print-certs "$ARM_SRC" 2>&1)
+          printf '%s\n' "$CERT_OUTPUT"
           ACTUAL=$(
-            "$APKSIGNER" verify --print-certs "$ARM_SRC" \
-              | awk -F': ' 'tolower($1) ~ /signer.*certificate sha-256 digest$/ {print $2; exit}' \
+            printf '%s\n' "$CERT_OUTPUT" \
+              | sed -nE 's/^.*certificate SHA-256 digest:[[:space:]]*([[:xdigit:]:]+).*$/\\1/p' \
+              | head -n1 \
               | tr -d ':' \
               | tr '[:lower:]' '[:upper:]'
           )
