@@ -113,7 +113,7 @@ jobs:
           "$APKSIGNER" verify --verbose --print-certs "$ARM_SRC"
           ACTUAL=$(
             "$APKSIGNER" verify --print-certs "$ARM_SRC" \
-              | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}' \
+              | awk -F': ' 'tolower($1) ~ /signer.*certificate sha-256 digest$/ {print $2; exit}' \
               | tr -d ':' \
               | tr '[:lower:]' '[:upper:]'
           )
