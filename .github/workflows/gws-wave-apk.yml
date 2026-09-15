@@ -114,8 +114,9 @@ jobs:
           printf '%s\n' "$CERT_OUTPUT"
           ACTUAL=$(
             printf '%s\n' "$CERT_OUTPUT" \
-              | sed -nE 's/^.*certificate SHA-256 digest:[[:space:]]*([[:xdigit:]:]+).*$/\\1/p' \
+              | grep -i 'certificate SHA-256 digest:' \
               | head -n1 \
+              | awk '{print $NF}' \
               | tr -d ':' \
               | tr '[:lower:]' '[:upper:]'
           )
