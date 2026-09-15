@@ -87,7 +87,7 @@ fun Sidebar(
     val expanded = hasFocus
     val sidebarWidth by animateDpAsState(
         targetValue = if (expanded) Dimens.SidebarWidthExpanded else Dimens.SidebarWidthCollapsed,
-        label = "waveSidebarWidth",
+        label = "gwsSidebarWidth",
     )
 
     val hasLive = MainSection.LIVE_TV in visibleSections
