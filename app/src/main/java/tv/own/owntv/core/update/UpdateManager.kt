@@ -37,7 +37,7 @@ class UpdateManager(
     private val context: Context,
     private val client: OkHttpClient,
 ) {
-    data class UpdateInfo(val version: String, val notes: String, val apkUrl: String)
+    data class UpdateInfo(val version: String, val notes: String, val apkUrl: String, val versionCode: Int? = null)
 
     sealed interface Failure {
         data class CheckHttp(val code: Int) : Failure
@@ -96,12 +96,47 @@ class UpdateManager(
     /** Startup check used by the shell. Future releases now surface automatically after launch. */
     fun check() = checkManual()
 
+    /** GWS Wave-only update check against the stable manifest published by Wave CI. */
+    private fun checkWaveManual() {
+        if (_state.value is State.Checking || _state.value is State.Downloading) return
+        _state.value = State.Checking
+        scope.launch {
+            runCatching {
+                // Cache-bust because raw.githubusercontent.com may otherwise briefly serve the previous
+                // manifest immediately after CI publishes a fresh APK.
+                val request = Request.Builder()
+                    .url("$WAVE_MANIFEST_URL?t=${System.currentTimeMillis()}")
+                    .header("User-Agent", "GWSWave")
+                    .build()
+                client.newCall(request).execute().use { resp ->
+                    if (!resp.isSuccessful) throw CheckHttpException(resp.code)
+                    val body = resp.body.string()
+                    if (body.isBlank()) throw InvalidReleaseResponseException()
+                    val o = runCatching { JSONObject(body) }.getOrElse { throw InvalidReleaseResponseException() }
+                    val versionCode = o.optInt("versionCode", -1)
+                    val version = o.optString("versionName").takeIf { it.isNotBlank() }
+                        ?: throw InvalidReleaseResponseException()
+                    val apkUrl = o.optString("apkUrl").takeIf { it.startsWith("https://") }
+                        ?: throw InvalidReleaseResponseException()
+                    val notes = o.optString("notes").take(16_000)
+                    if (versionCode <= 0) throw InvalidReleaseResponseException()
+                    val info = UpdateInfo(version, notes, apkUrl, versionCode)
+                    if (versionCode > BuildConfig.VERSION_CODE) _state.value = State.Available(info)
+                    else _state.value = State.UpToDate
+                }
+            }.onFailure { error ->
+                Log.w(TAG, "GWS Wave update check failed: ${error.message}", error)
+                _state.value = State.Failed(failureFor(error, checking = true))
+            }
+        }
+    }
+
     /** Queries GWS Online's latest release. */
     fun checkManual() {
-        // GWS Wave is a separate applicationId and must never install GWS Online release APKs.
-        // Keep this updater dormant until Wave has a dedicated release feed.
-        if (context.packageName == "tv.gws.wave") {
-            _state.value = State.UpToDate
+        // GWS Wave has its own package, signing identity and update feed. Never point it at
+        // GWS Online releases; the two apps remain independently installable and independently updated.
+        if (context.packageName == WAVE_PACKAGE) {
+            checkWaveManual()
             return
         }
         if (_state.value is State.Checking || _state.value is State.Downloading) return
@@ -158,8 +193,12 @@ class UpdateManager(
         scope.launch {
             runCatching {
                 val dir = File(context.filesDir, "updates").apply { mkdirs() }
-                val out = File(dir, "gws-online-update.apk")
-                val request = Request.Builder().url(info.apkUrl).header("User-Agent", "GWSOnline").build()
+                val isWave = context.packageName == WAVE_PACKAGE
+                val out = File(dir, if (isWave) "gws-wave-update.apk" else "gws-online-update.apk")
+                val request = Request.Builder()
+                    .url(info.apkUrl)
+                    .header("User-Agent", if (isWave) "GWSWave" else "GWSOnline")
+                    .build()
                 client.newCall(request).execute().use { resp ->
                     if (!resp.isSuccessful) throw DownloadHttpException(resp.code)
                     val body = resp.body
@@ -402,6 +441,10 @@ class UpdateManager(
 
     companion object {
         private const val TAG = "UpdateManager"
+        private const val WAVE_PACKAGE = "tv.gws.wave"
+        // GWS_WAVE_UPDATE_MANIFEST_URL — deliberately separate from GWS Online GitHub Releases.
+        private const val WAVE_MANIFEST_URL =
+            "https://raw.githubusercontent.com/boberthegr8/GreatWhiteTV-Own/gws-wave-downloads/wave-update.json"
         const val REPO = "boberthegr8/GreatWhiteTV-Own"
     }
 }
