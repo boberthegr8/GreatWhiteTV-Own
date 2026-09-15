@@ -44,9 +44,9 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import tv.own.owntv.R
 import tv.own.owntv.features.shell.MainSection
+import tv.own.owntv.ui.components.BrandLockup
 import tv.own.owntv.ui.components.FocusableSurface
 import tv.own.owntv.ui.components.NavAccentBar
-import tv.own.owntv.ui.components.NavDuotoneIcon
 import tv.own.owntv.ui.components.OwnTVAvatar
 import tv.own.owntv.ui.components.OwnTVIcon
 import tv.own.owntv.ui.components.RailPanelFill
@@ -58,12 +58,12 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 import tv.own.owntv.ui.theme.glass
 
 /**
- * GWS Online navigation drawer.
+ * GWS Wave TV-first navigation rail.
  *
- * GWS v1.0.18: the customer-facing main nav is intentionally minimal:
- * Live TV, Movies, TV Shows, Settings. TV Guide is a child of Live TV and only appears directly under
- * Live while Live/Guide is active. Other internal MainSection destinations remain available for deep
- * links and supporting flows, but are not exposed as duplicate top-level navigation choices.
+ * Wave keeps the rail narrow while content has focus, then expands when the user moves left. The
+ * information architecture deliberately mirrors how people browse IPTV on a television: Home,
+ * Live TV, Guide, Movies, Series and Search are direct destinations instead of hiding useful
+ * destinations behind secondary screens.
  */
 @Composable
 fun Sidebar(
@@ -87,18 +87,25 @@ fun Sidebar(
     val expanded = hasFocus
     val sidebarWidth by animateDpAsState(
         targetValue = if (expanded) Dimens.SidebarWidthExpanded else Dimens.SidebarWidthCollapsed,
-        label = "gwsSidebarWidth",
+        label = "waveSidebarWidth",
     )
 
-    val primarySections = remember {
-        listOf(MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES)
+    val hasLive = MainSection.LIVE_TV in visibleSections
+    val waveSections = buildList {
+        add(MainSection.HOME)
+        if (hasLive) {
+            add(MainSection.LIVE_TV)
+            add(MainSection.EPG)
+        }
+        if (MainSection.MOVIES in visibleSections) add(MainSection.MOVIES)
+        if (MainSection.SERIES in visibleSections) add(MainSection.SERIES)
+        add(MainSection.SEARCH)
     }
-    val browseSections = primarySections
     val focusSection = when {
         selected == MainSection.SETTINGS -> MainSection.SETTINGS
-        selected == MainSection.EPG -> MainSection.LIVE_TV
-        selected in primarySections -> selected
-        else -> MainSection.LIVE_TV
+        selected in waveSections -> selected
+        selected == MainSection.EPG && hasLive -> MainSection.EPG
+        else -> MainSection.HOME
     }
 
     Column(
@@ -108,7 +115,9 @@ fun Sidebar(
                 val entered = it.hasFocus && !hasFocus
                 hasFocus = it.hasFocus
                 if (it.hasFocus) onFocused()
-                if (entered) scope.launch { runCatching { selectedItemFocusRequester.requestFocus() } }
+                if (entered) {
+                    scope.launch { runCatching { selectedItemFocusRequester.requestFocus() } }
+                }
             }
             .focusGroup()
             .width(sidebarWidth)
@@ -117,7 +126,7 @@ fun Sidebar(
             .padding(top = 12.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        AppLogo()
+        WaveLogo(expanded = expanded)
         Spacer(Modifier.height(12.dp))
 
         Box(
@@ -125,20 +134,24 @@ fun Sidebar(
                 .weight(1f)
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState()),
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.TopCenter,
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 if (expanded) {
-                    SectionLabel(stringResource(R.string.common_browse))
-                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.wave_browse).uppercase(),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.fillMaxWidth().padding(start = 18.dp, bottom = 7.dp),
+                    )
                 }
 
-                browseSections.forEach { section ->
-                    NavItem(
+                waveSections.forEach { section ->
+                    WaveNavItem(
                         section = section,
                         active = section == selected,
                         expanded = expanded,
-                        nested = false,
                         count = counts(section),
                         onClick = { onSelect(section) },
                         modifier = if (section == focusSection) {
@@ -147,27 +160,28 @@ fun Sidebar(
                     )
                     Spacer(Modifier.height(4.dp))
                 }
-
-                NavItem(
-                    section = MainSection.SETTINGS,
-                    active = selected == MainSection.SETTINGS,
-                    expanded = expanded,
-                    count = 0,
-                    onClick = { onSelect(MainSection.SETTINGS) },
-                    modifier = if (focusSection == MainSection.SETTINGS) {
-                        Modifier.focusRequester(selectedItemFocusRequester)
-                    } else Modifier,
-                )
             }
         }
 
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp)
+                .padding(horizontal = 10.dp, vertical = 7.dp)
                 .height(1.dp)
                 .background(colors.outlineVariant),
         )
+
+        WaveNavItem(
+            section = MainSection.SETTINGS,
+            active = selected == MainSection.SETTINGS,
+            expanded = expanded,
+            count = 0,
+            onClick = { onSelect(MainSection.SETTINGS) },
+            modifier = if (focusSection == MainSection.SETTINGS) {
+                Modifier.focusRequester(selectedItemFocusRequester)
+            } else Modifier,
+        )
+        Spacer(Modifier.height(8.dp))
         ProfileCard(
             expanded = expanded,
             avatarId = avatarId,
@@ -180,20 +194,31 @@ fun Sidebar(
 }
 
 @Composable
-private fun AppLogo(modifier: Modifier = Modifier) {
+private fun WaveLogo(expanded: Boolean) {
+    if (expanded) {
+        BrandLockup(
+            modifier = Modifier.padding(horizontal = 10.dp),
+            markSize = 32,
+            textSize = 19,
+        )
+        return
+    }
+
     val colors = OwnTVTheme.colors
+    val shape = RoundedCornerShape(16.dp)
     Box(
-        modifier = modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .border(width = 2.dp, color = colors.primary, shape = RoundedCornerShape(20.dp)),
+        modifier = Modifier
+            .size(48.dp)
+            .clip(shape)
+            .background(colors.card)
+            .border(2.dp, colors.primary, shape),
         contentAlignment = Alignment.Center,
     ) {
         OwnTVIcon(
             icon = OwnTVIcon.PLAY,
             tint = colors.primary,
-            modifier = Modifier.size(26.dp),
             filled = true,
+            modifier = Modifier.size(23.dp),
         )
     }
 }
@@ -210,7 +235,7 @@ private fun ProfileCard(
     if (!expanded) {
         AvatarButton(
             avatarId = avatarId,
-            sizeDp = 56,
+            sizeDp = 48,
             onClick = onSwitchProfile,
             onLongClick = onPickAvatar,
         )
@@ -219,7 +244,8 @@ private fun ProfileCard(
 
     val colors = OwnTVTheme.colors
     val sourceLabel = sourceSummary ?: stringResource(R.string.shell_no_source)
-    val shape = RoundedCornerShape(16.dp)
+    val displayName = profileName.ifBlank { stringResource(R.string.wave_profile_default) }
+    val shape = RoundedCornerShape(14.dp)
     FocusableSurface(
         onClick = onSwitchProfile,
         onLongClick = onPickAvatar,
@@ -236,10 +262,10 @@ private fun ProfileCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            OwnTVAvatar(avatarId = avatarId, modifier = Modifier.size(42.dp))
+            OwnTVAvatar(avatarId = avatarId, modifier = Modifier.size(40.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    profileName.ifBlank { stringResource(R.string.common_own_tv_user) },
+                    text = displayName,
                     style = MaterialTheme.typography.labelLarge,
                     color = if (focused) colors.onSurface else colors.onSurfaceVariant,
                     fontWeight = FontWeight.SemiBold,
@@ -248,7 +274,7 @@ private fun ProfileCard(
                     modifier = if (focused) Modifier.basicMarquee(iterations = Int.MAX_VALUE) else Modifier,
                 )
                 Text(
-                    sourceLabel,
+                    text = sourceLabel,
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant,
                     maxLines = 1,
@@ -283,33 +309,19 @@ private fun AvatarButton(
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
-        color = OwnTVTheme.colors.onSurfaceVariant,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.fillMaxWidth().padding(start = 18.dp),
-    )
-}
-
-@Composable
-private fun NavItem(
+private fun WaveNavItem(
     section: MainSection,
     active: Boolean,
     expanded: Boolean,
     count: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    nested: Boolean = false,
 ) {
     val colors = OwnTVTheme.colors
     val shape = RoundedCornerShape(13.dp)
     FocusableSurface(
         onClick = onClick,
-        modifier = modifier
-            .then(if (nested && expanded) Modifier.padding(start = 20.dp) else Modifier)
-            .fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         selected = active,
         shape = shape,
         focusedContainerColor = Color.Transparent,
@@ -322,26 +334,28 @@ private fun NavItem(
     ) { focused ->
         val ladder = rememberNavLadderColors(selected = active, focused = focused)
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-            NavAccentBar(visible = ladder.showAccentBar, height = if (nested) 20.dp else 24.dp)
+            NavAccentBar(visible = ladder.showAccentBar, height = 24.dp)
             Box(
                 modifier = Modifier
                     .then(
                         if (expanded) Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-                        else Modifier.width(52.dp)
+                        else Modifier.width(52.dp),
                     )
-                    .height(if (nested) 38.dp else 42.dp)
+                    .height(42.dp)
                     .clip(shape)
                     .glass(surface = GlassSurface.SIDEBAR, baseFill = ladder.container, shape = shape)
                     .then(
-                        if (active) Modifier.background(
-                            Brush.linearGradient(
-                                listOf(
-                                    colors.primary.copy(alpha = 0.58f),
-                                    colors.primaryContainer.copy(alpha = 0.70f),
+                        if (active) {
+                            Modifier.background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        colors.primary.copy(alpha = 0.62f),
+                                        colors.primaryContainer.copy(alpha = 0.72f),
+                                    ),
                                 ),
-                            ),
-                            shape,
-                        ) else Modifier
+                                shape,
+                            )
+                        } else Modifier,
                     )
                     .then(
                         when {
@@ -356,31 +370,33 @@ private fun NavItem(
                                 shape,
                             )
                             else -> Modifier
-                        }
+                        },
                     ),
                 contentAlignment = if (expanded) Alignment.CenterStart else Alignment.Center,
             ) {
+                val foreground = if (active) colors.onPrimaryContainer else ladder.icon
                 if (expanded) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(if (nested) 10.dp else 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        NavDuotoneIcon(
-                            section = section,
-                            color = if (active) colors.onPrimaryContainer else ladder.icon,
-                            modifier = Modifier.size(if (nested) 22.dp else 28.dp),
+                        OwnTVIcon(
+                            icon = section.waveIcon(),
+                            tint = foreground,
+                            modifier = Modifier.size(26.dp),
+                            filled = active,
                         )
                         Text(
                             text = stringResource(section.labelRes),
-                            style = if (nested) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-                            color = if (active) colors.onPrimaryContainer else ladder.icon,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = foreground,
                             fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        if (count > 0) {
+                        if (count > 0 && section in setOf(MainSection.LIVE_TV, MainSection.MOVIES, MainSection.SERIES)) {
                             Text(
                                 text = count.toString(),
                                 style = MaterialTheme.typography.labelSmall,
@@ -389,13 +405,26 @@ private fun NavItem(
                         }
                     }
                 } else {
-                    NavDuotoneIcon(
-                        section = section,
-                        color = if (active) colors.onPrimaryContainer else ladder.icon,
-                        modifier = Modifier.size(if (nested) 24.dp else 28.dp),
+                    OwnTVIcon(
+                        icon = section.waveIcon(),
+                        tint = foreground,
+                        modifier = Modifier.size(27.dp),
+                        filled = active,
                     )
                 }
             }
         }
     }
+}
+
+private fun MainSection.waveIcon(): OwnTVIcon = when (this) {
+    MainSection.SEARCH -> OwnTVIcon.SEARCH
+    MainSection.HOME -> OwnTVIcon.HOME
+    MainSection.LIVE_TV -> OwnTVIcon.LIVE_TV
+    MainSection.MOVIES -> OwnTVIcon.MOVIES
+    MainSection.SERIES -> OwnTVIcon.SERIES
+    MainSection.ONLINE -> OwnTVIcon.MOVIES
+    MainSection.DOWNLOADS -> OwnTVIcon.DOWNLOADS
+    MainSection.EPG -> OwnTVIcon.EPG
+    MainSection.SETTINGS -> OwnTVIcon.SETTINGS
 }
