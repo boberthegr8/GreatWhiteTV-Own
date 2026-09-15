@@ -20,6 +20,39 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Apply GWS Wave branch invariants
+        if: github.event.pull_request.head.ref == 'gws-wave'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          shell = Path('app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt')
+          text = shell.read_text(encoding='utf-8')
+          text = text.replace(
+              'val allBrowse: Set<MainSection> = browseOrder.toSet()',
+              'val allBrowse: Set<MainSection> = browseOrder.toSet() + HOME',
+          )
+          text = text.replace(
+              'fun dynamicVisible(hasLive: Boolean, hasMovies: Boolean, hasSeries: Boolean): Set<MainSection> = buildSet {\n            if (hasLive) add(LIVE_TV)',
+              'fun dynamicVisible(hasLive: Boolean, hasMovies: Boolean, hasSeries: Boolean): Set<MainSection> = buildSet {\n            add(HOME)\n            if (hasLive) add(LIVE_TV)',
+          )
+          shell.write_text(text, encoding='utf-8')
+
+          gradle = Path('app/build.gradle.kts')
+          text = gradle.read_text(encoding='utf-8').replace(
+              'applicationId = "tv.own.owntv"',
+              'applicationId = "tv.gws.wave"',
+          )
+          gradle.write_text(text, encoding='utf-8')
+          PY
+          if ! git diff --quiet -- app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt app/build.gradle.kts; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add app/src/main/java/tv/own/owntv/features/shell/ShellViewModel.kt app/build.gradle.kts
+            git commit -m "fix(wave): keep Home visible and separate install identity"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
