@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -147,7 +148,7 @@ fun WaveLiveBrowseOverlay(
             Row(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .fillMaxWidth(0.88f)
+                    .fillMaxWidth()
                     .roundedPanel(radius = 20.dp, fillColor = ContentPanelFill, surface = GlassSurface.DIALOGS)
                     .focusGroup()
                     .padding(14.dp),

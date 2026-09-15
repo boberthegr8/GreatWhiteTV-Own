@@ -962,7 +962,7 @@ fun OwnTVShell(
                     inert = showChannelList || showHistoryList || showGuideOverlay || showCategoryBrowser || showSubtitleSearch || showLocalSubPicker,
                     onChannelUp = zap?.let { z -> { z(-1) } },
                     onChannelDown = zap?.let { z -> { z(1) } },
-                    onOpenChannelList = if (isTunedLive && liveCanZap) { { showChannelList = true } } else null,
+                    onOpenChannelList = if (isTunedLive) { { showChannelList = true } } else null,
                     onOpenHistoryList = if (isTunedLive) { { showHistoryList = true } } else null,
                     onOpenGuide = if (isTunedLive) {
                         {
@@ -1068,32 +1068,26 @@ fun OwnTVShell(
                     )
                 }
                 tv.own.owntv.ui.components.InAppToast(localSubToast)
-                // Left — the playing channel's own provider category.
+                // GWS_WAVE_FULL_HEIGHT_LIVE_BROWSER
+                // One slide-in Live TV browser: categories stay visible on the left while the selected
+                // category's channels stay beside them. No second-Left mini category menu.
                 if (showChannelList && isLiveChannel) {
-                    if (showCategoryBrowser) {
-                        // Second Left — every Live TV category.
-                        tv.own.owntv.features.shell.components.CategoryBrowserOverlay(
-                            categories = browserCategories,
-                            currentCategoryId = previewChannel?.categoryId,
-                            onSelect = { catId -> liveVm.loadChannelsForCategory(catId) },
-                            onDismiss = { liveVm.hideCategoryBrowser() },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else if (zapChannels.isNotEmpty()) {
-                        // First Left — the channels of the current category. A browsed-to category may
-                        // hold a single channel, so this renders for any non-empty list.
-                        tv.own.owntv.features.shell.components.ChannelListOverlay(
-                            channels = zapChannels,
-                            currentId = previewChannel?.id,
-                            nowPlaying = overlayNowPlaying,
-                            title = zapOverlayTitle,
-                            showNumbers = directTuneEnabled,
-                            onSelect = { liveVm.ensurePlaying(it); showChannelList = false },
-                            onDismiss = { showChannelList = false },
-                            onOpenCategories = { liveVm.showCategories() },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
+                    tv.own.owntv.features.shell.components.WaveLiveBrowseOverlay(
+                        categories = browserCategories,
+                        currentCategoryId = previewChannel?.categoryId,
+                        channels = zapChannels,
+                        currentId = previewChannel?.id,
+                        nowPlaying = overlayNowPlaying,
+                        title = zapOverlayTitle,
+                        showNumbers = directTuneEnabled,
+                        onSelectCategory = { catId -> liveVm.loadChannelsForCategory(catId) },
+                        onSelectChannel = { channel -> liveVm.ensurePlaying(channel) },
+                        onDismiss = {
+                            showChannelList = false
+                            liveVm.hideCategoryBrowser()
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 // GUIDE — real EPG grid in the same sliding family as categories/channels, while video keeps playing.
                 if (showGuideOverlay && isLiveChannel) {
