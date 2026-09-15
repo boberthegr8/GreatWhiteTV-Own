@@ -20,37 +20,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Isolate Wave updater
-        if: github.event.pull_request.head.ref == 'gws-wave'
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path('app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt')
-          text = path.read_text(encoding='utf-8')
-          old = '''    fun checkManual() {
-        if (_state.value is State.Checking || _state.value is State.Downloading) return
-'''
-          new = '''    fun checkManual() {
-        // GWS Wave is a separate applicationId and must never install GWS Online release APKs.
-        // Keep the updater dormant until Wave has its own release feed.
-        if (context.packageName == "tv.gws.wave") {
-            _state.value = State.UpToDate
-            return
-        }
-        if (_state.value is State.Checking || _state.value is State.Downloading) return
-'''
-          if old in text:
-              text = text.replace(old, new, 1)
-              path.write_text(text, encoding='utf-8')
-          PY
-          if ! git diff --quiet -- app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt; then
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt
-            git commit -m "fix(wave): isolate updater from GWS Online releases"
-            git push origin HEAD:${{ github.event.pull_request.head.ref }}
-          fi
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
