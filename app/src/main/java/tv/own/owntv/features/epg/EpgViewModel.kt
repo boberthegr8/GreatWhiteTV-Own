@@ -71,7 +71,7 @@ sealed interface EpgMatchSummary {
 }
 
 data class EpgUiState(
-    /** All channels with guide data in the window; each row loads its own programmes lazily. */
+    /** Provider channels in the guide; rows without matching EPG remain tunable and simply have no programmes. */
     val channels: List<ChannelEntity> = emptyList(),
     val windowStart: Long = 0,
     val windowEnd: Long = 0,
@@ -668,7 +668,12 @@ class EpgViewModel(
             // Respect customizations: hidden channels stay out of the guide, renames show.
             val cust = customize.observe(pid, MediaType.LIVE).first()
             val q = _query.value.trim()
-            val rawChannels = channelDao.channelsWithGuide(ids, q, MAX_CHANNELS)
+            // GWS_WAVE_SHOW_PROVIDER_CHANNELS_WITHOUT_EPG
+            // The provider lineup is authoritative. Guide data enriches rows when ids match, but a
+            // missing/mismatched EPG id must never make a real provider channel disappear.
+            val rawChannels = channelDao.allForSources(playlistIds, MAX_CHANNELS).let { all ->
+                if (q.isBlank()) all else all.filter { it.name.contains(q, ignoreCase = true) }
+            }
             // Catch-up count comes from the playlist channels (the tv_archive flag), so it shows even
             // before any XMLTV guide is downloaded — it tells the user their provider supports catch-up.
             val catchupCount = channelDao.countCatchup(playlistIds)
@@ -769,9 +774,7 @@ class EpgViewModel(
             val shouldAutoRefresh = (stored == 0 || noCurrentProgrammes) &&
                 refreshKey.isNotEmpty() && autoRefreshAttemptedFor != refreshKey
             val message = when {
-                stored == 0 -> null // handled by the "No EPG added" prompt (hasEpgSources=false)
                 channels.isEmpty() && q.isNotBlank() -> EpgMessage.NoChannelsForQuery(q)
-                channels.isEmpty() -> EpgMessage.MismatchedIds
                 else -> null
             }
             val guideChannels = if (stored > 0) epgDao.countGuideChannels(ids) else 0

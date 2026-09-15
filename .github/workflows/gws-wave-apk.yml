@@ -1,0 +1,178 @@
+name: GWS Wave preview APK
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-wave-apk:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_CERT_SHA256: "747D79B61658943AB4B882E74C122E27B0472E3C9D76A256D7936AC5ABE365A9"
+    steps:
+      - name: Checkout GWS Wave branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Compute isolated Wave version
+        shell: bash
+        run: |
+          set -euo pipefail
+          CODE=$((200000 + GITHUB_RUN_NUMBER))
+          NAME="1.0.${GITHUB_RUN_NUMBER}"
+          echo "WAVE_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+          echo "WAVE_VERSION_NAME=$NAME" >> "$GITHUB_ENV"
+          echo "GWS Wave version: $NAME ($CODE)"
+
+      - name: Apply Wave service presets
+        run: python3 tools/gws_wave_service_presets.py
+
+      - name: Apply Wave Live browser and EPG fallback
+        run: python3 tools/gws_wave_live_ui.py
+
+      - name: Enable Wave-only self updater
+        run: python3 tools/gws_wave_updater.py
+
+      - name: Normalize i18n records
+        run: python3 tools/i18n/check_hardcoded_strings.py prune-safe
+
+      - name: Commit generated Wave source changes
+        shell: bash
+        run: |
+          if ! git diff --quiet; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add \
+              app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt \
+              app/src/main/java/tv/own/owntv/features/shell/OwnTVShell.kt \
+              app/src/main/java/tv/own/owntv/features/shell/components/WaveLiveBrowseOverlay.kt \
+              app/src/main/java/tv/own/owntv/features/epg/EpgViewModel.kt \
+              app/src/main/java/tv/own/owntv/core/update/UpdateManager.kt \
+              tools/i18n/safe_literals.txt \
+              tools/i18n/hardcoded_baseline.txt
+            git commit -m "GWS Wave: apply generated Wave-only source changes"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
+
+      - name: Restore dedicated GWS Wave signing key
+        env:
+          WAVE_KEYSTORE_BASE64: ${{ secrets.WAVE_KEYSTORE_BASE64 }}
+          WAVE_KEYSTORE_PASSWORD: ${{ secrets.WAVE_KEYSTORE_PASSWORD }}
+          WAVE_KEY_ALIAS: ${{ secrets.WAVE_KEY_ALIAS }}
+          WAVE_KEY_PASSWORD: ${{ secrets.WAVE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$WAVE_KEYSTORE_BASE64" ] || [ -z "$WAVE_KEYSTORE_PASSWORD" ] || [ -z "$WAVE_KEY_ALIAS" ] || [ -z "$WAVE_KEY_PASSWORD" ]; then
+            echo "::error::Dedicated GWS Wave signing secrets are not configured. See GWS-Wave-Permanent-Signing-Setup.zip."
+            exit 1
+          fi
+          printf '%s' "$WAVE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/gws-wave-release.jks"
+          echo "::add-mask::$WAVE_KEYSTORE_PASSWORD"
+          echo "::add-mask::$WAVE_KEY_PASSWORD"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/gws-wave-release.jks" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$WAVE_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$WAVE_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$WAVE_KEY_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Build permanently signed GWS Wave APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          VERSION_CODE="$WAVE_VERSION_CODE" VERSION_NAME="$WAVE_VERSION_NAME" \
+            ./gradlew :app:assembleStandardRelease --stacktrace
+          ARM_SRC=$(ls app/build/outputs/apk/standard/release/*.apk | head -n1)
+          test -s "$ARM_SRC"
+          echo "ARM_SRC=$ARM_SRC" >> "$GITHUB_ENV"
+
+      - name: Verify stable signing identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n1)
+          test -x "$APKSIGNER"
+          CERT_OUTPUT=$("$APKSIGNER" verify --verbose --print-certs "$ARM_SRC" 2>&1)
+          printf '%s\n' "$CERT_OUTPUT"
+          ACTUAL=$(
+            printf '%s\n' "$CERT_OUTPUT" \
+              | grep -i 'certificate SHA-256 digest:' \
+              | head -n1 \
+              | awk '{print $NF}' \
+              | tr -d ':' \
+              | tr '[:lower:]' '[:upper:]'
+          )
+          if [ "$ACTUAL" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::GWS Wave signer changed. Refusing to publish an APK that would break future updates."
+            echo "Expected: $EXPECTED_CERT_SHA256"
+            echo "Actual:   $ACTUAL"
+            exit 1
+          fi
+          echo "Stable Wave signing certificate verified: $ACTUAL"
+
+      - name: Stage APK and Wave update manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p wave-apk
+          cp "$ARM_SRC" wave-apk/GWS-Wave-Preview.apk
+          APK_SHA256=$(sha256sum wave-apk/GWS-Wave-Preview.apk | awk '{print $1}')
+          cat > wave-apk/wave-update.json <<EOF
+          {
+            "versionCode": $WAVE_VERSION_CODE,
+            "versionName": "$WAVE_VERSION_NAME",
+            "apkUrl": "https://raw.githubusercontent.com/boberthegr8/GreatWhiteTV-Own/gws-wave-downloads/GWS-Wave-Preview.apk",
+            "sha256": "$APK_SHA256",
+            "notes": "GWS Wave $WAVE_VERSION_NAME — latest Wave-only improvements and fixes."
+          }
+          EOF
+          cat wave-apk/wave-update.json
+
+      - name: Upload GWS Wave APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GWS-Wave-Preview-APK
+          path: |
+            wave-apk/GWS-Wave-Preview.apk
+            wave-apk/wave-update.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish stable Wave download and update feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp wave-apk/GWS-Wave-Preview.apk /tmp/GWS-Wave-Preview.apk
+          cp wave-apk/wave-update.json /tmp/wave-update.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git switch --orphan gws-wave-downloads
+          git rm -rf . || true
+          cp /tmp/GWS-Wave-Preview.apk ./GWS-Wave-Preview.apk
+          cp /tmp/wave-update.json ./wave-update.json
+          printf '%s\n' \
+            '# GWS Wave APK' \
+            '' \
+            'Stable permanently signed APK and update manifest for GWS Wave.' \
+            'This branch/feed is separate from GWS Online and main.' > README.md
+          git add GWS-Wave-Preview.apk wave-update.json README.md
+          git commit -m "Publish GWS Wave $WAVE_VERSION_NAME"
+          git push --force origin HEAD:gws-wave-downloads
