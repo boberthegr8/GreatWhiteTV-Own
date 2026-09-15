@@ -5,4 +5,17 @@
     <string name="wave_brand_wave"> Wave</string>
     <string name="wave_profile_default">GWS Wave User</string>
     <string name="wave_browse">Browse</string>
+
+    <string name="wave_service_title">TV service</string>
+    <string name="wave_service_description">Choose your service. GWS Wave will fill in its DNS/server automatically.</string>
+    <string name="wave_service_picker_title">Choose TV service</string>
+    <string name="wave_service_hush">Hush</string>
+    <string name="wave_service_cctv">CCTV</string>
+    <string name="wave_service_purevision">Purevision</string>
+    <string name="wave_service_custom">Custom</string>
+    <string name="wave_service_hush_dns" translatable="false">https://ottipdns.com</string>
+    <string name="wave_service_cctv_dns" translatable="false">https://twistedapex.com</string>
+    <string name="wave_service_purevision_dns" translatable="false">https://best-streams.tv:443</string>
+    <string name="wave_dns_server">DNS / Server</string>
+    <string name="wave_dns_change_hint">You can change this DNS/server here at any time. Editing it to a different address switches the service to Custom.</string>
 </resources>
