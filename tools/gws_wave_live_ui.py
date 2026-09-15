@@ -23,12 +23,9 @@ def replace_once(text: str, old: str, new: str, label: str) -> str:
 
 def patch_wave_browser() -> None:
     text = WAVE_BROWSER.read_text(encoding="utf-8")
-    if "import androidx.compose.foundation.layout.weight" not in text:
-        text = text.replace(
-            "import androidx.compose.foundation.layout.width\n",
-            "import androidx.compose.foundation.layout.width\nimport androidx.compose.foundation.layout.weight\n",
-            1,
-        )
+    # RowScope/ColumnScope provide weight() as a member extension in this Compose version.
+    # Importing androidx.compose.foundation.layout.weight resolves an internal property and fails Kotlin compile.
+    text = text.replace("import androidx.compose.foundation.layout.weight\n", "")
     text = text.replace(".fillMaxWidth(0.88f)", ".fillMaxWidth()", 1)
     WAVE_BROWSER.write_text(text, encoding="utf-8")
     print("WaveLiveBrowseOverlay: full-screen layout ready")
