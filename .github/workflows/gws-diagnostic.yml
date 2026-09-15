@@ -15,17 +15,230 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
+
+      - name: Apply GWS Wave service presets
+        if: github.event.pull_request.head.ref == 'gws-wave'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt')
+          text = path.read_text(encoding='utf-8')
+          marker = 'private enum class WaveService { HUSH, CCTV, PUREVISION, CUSTOM }'
+          if marker not in text:
+              text = text.replace(
+                  'private enum class SourceKind { XTREAM, M3U, STALKER }',
+                  'private enum class SourceKind { XTREAM, M3U, STALKER }\nprivate enum class WaveService { HUSH, CCTV, PUREVISION, CUSTOM }',
+                  1,
+              )
+
+              text = text.replace(
+                  '''    val colors = OwnTVTheme.colors
+    val editing = initial != null
+    var kind by remember {''',
+                  '''    val colors = OwnTVTheme.colors
+    val editing = initial != null
+    val waveServiceLabels = mapOf(
+        WaveService.HUSH to stringResource(R.string.wave_service_hush),
+        WaveService.CCTV to stringResource(R.string.wave_service_cctv),
+        WaveService.PUREVISION to stringResource(R.string.wave_service_purevision),
+        WaveService.CUSTOM to stringResource(R.string.wave_service_custom),
+    )
+    val waveServiceServers = mapOf(
+        WaveService.HUSH to stringResource(R.string.wave_service_hush_dns),
+        WaveService.CCTV to stringResource(R.string.wave_service_cctv_dns),
+        WaveService.PUREVISION to stringResource(R.string.wave_service_purevision_dns),
+    )
+    fun normalizedDns(value: String): String = value.trim().trimEnd('/').lowercase()
+    fun inferWaveService(value: String): WaveService {
+        val normalized = normalizedDns(value)
+        return waveServiceServers.entries.firstOrNull { normalizedDns(it.value) == normalized }?.key
+            ?: WaveService.CUSTOM
+    }
+    var kind by remember {''',
+                  1,
+              )
+
+              text = text.replace(
+                  '''    var name by remember(initial) { mutableStateOf(initial?.name ?: "") }
+    var server by remember(initial) { mutableStateOf(if (initial != null && initial.type == SourceType.XTREAM) initial.url else "") }
+    var username by remember(initial) { mutableStateOf(initial?.username ?: "") }''',
+                  '''    var name by remember(initial) { mutableStateOf(initial?.name ?: "") }
+    val initialXtreamServer = if (initial != null && initial.type == SourceType.XTREAM) initial.url else ""
+    var waveService by remember(initial) {
+        mutableStateOf(
+            if (initialXtreamServer.isBlank()) {
+                if (initial == null) WaveService.HUSH else WaveService.CUSTOM
+            } else {
+                inferWaveService(initialXtreamServer)
+            },
+        )
+    }
+    var server by remember(initial) {
+        mutableStateOf(
+            if (initialXtreamServer.isNotBlank()) initialXtreamServer
+            else if (initial == null) waveServiceServers[WaveService.HUSH].orEmpty()
+            else "",
+        )
+    }
+    var showServicePicker by remember { mutableStateOf(false) }
+    var username by remember(initial) { mutableStateOf(initial?.username ?: "") }''',
+                  1,
+              )
+
+              text = text.replace(
+                  '''                else -> {
+                    server = payload.server
+                    username = payload.user''',
+                  '''                else -> {
+                    server = payload.server
+                    waveService = inferWaveService(payload.server)
+                    username = payload.user''',
+                  1,
+              )
+
+              text = text.replace(
+                  '''                SourceKind.XTREAM -> {
+                    OwnTVTextField(server, { server = it }, label = stringResource(R.string.setup_server_url), placeholder = stringResource(R.string.setup_server_example), keyboardType = KeyboardType.Uri, modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVTextField(username, { username = it }, label = stringResource(R.string.setup_username), modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVTextField(password, { password = it }, label = if (editing) stringResource(R.string.setup_password_keep) else stringResource(R.string.setup_password), isPassword = true, modifier = Modifier.fillMaxWidth())
+                }''',
+                  '''                SourceKind.XTREAM -> {
+                    WaveServiceRow(
+                        selectedLabel = waveServiceLabels[waveService].orEmpty(),
+                        onClick = { showServicePicker = true },
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVTextField(
+                        server,
+                        { value ->
+                            server = value
+                            waveService = inferWaveService(value)
+                        },
+                        label = stringResource(R.string.wave_dns_server),
+                        placeholder = stringResource(R.string.setup_server_example),
+                        keyboardType = KeyboardType.Uri,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.wave_dns_change_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVTextField(username, { username = it }, label = stringResource(R.string.setup_username), modifier = Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVTextField(password, { password = it }, label = if (editing) stringResource(R.string.setup_password_keep) else stringResource(R.string.setup_password), isPassword = true, modifier = Modifier.fillMaxWidth())
+                }''',
+                  1,
+              )
+
+              text = text.replace(
+                  '''      if (showUaPresetPicker) {
+          PickerDialog(''',
+                  '''      if (showServicePicker) {
+          PickerDialog(
+              title = stringResource(R.string.wave_service_picker_title),
+              options = WaveService.entries.map { it.name to waveServiceLabels[it].orEmpty() },
+              selected = waveService.name,
+              onSelect = { value ->
+                  val selectedService = runCatching { WaveService.valueOf(value) }.getOrDefault(WaveService.CUSTOM)
+                  val oldLabel = waveServiceLabels[waveService].orEmpty()
+                  if (!editing && (name.isBlank() || name == oldLabel)) {
+                      name = waveServiceLabels[selectedService].orEmpty()
+                  }
+                  waveService = selectedService
+                  if (selectedService != WaveService.CUSTOM) {
+                      server = waveServiceServers[selectedService].orEmpty()
+                  }
+                  showServicePicker = false
+              },
+              onDismiss = { showServicePicker = false },
+          )
+      }
+      if (showUaPresetPicker) {
+          PickerDialog(''',
+                  1,
+              )
+
+              text = text.replace(
+                  '''/** A focusable settings row showing the current auto-refresh selection; opens a picker on click. */
+@Composable
+private fun playlistAutoRefreshLabel''',
+                  '''@Composable
+private fun WaveServiceRow(selectedLabel: String, onClick: () -> Unit) {
+    val colors = OwnTVTheme.colors
+    FocusableSurface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        contentAlignment = Alignment.CenterStart,
+        surface = GlassSurface.CARDS,
+    ) { _ ->
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    stringResource(R.string.wave_service_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface,
+                )
+                Text(
+                    stringResource(R.string.wave_service_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant,
+                )
+            }
+            Text(
+                selectedLabel,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.primary,
+            )
+        }
+    }
+}
+
+/** A focusable settings row showing the current auto-refresh selection; opens a picker on click. */
+@Composable
+private fun playlistAutoRefreshLabel''',
+                  1,
+              )
+
+              path.write_text(text, encoding='utf-8')
+
+          if marker not in path.read_text(encoding='utf-8'):
+              raise SystemExit('Wave service preset patch did not apply')
+          PY
+
+          if ! git diff --quiet -- app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt
+            git commit -m "feat(wave): add service dropdown and editable DNS"
+            git push origin HEAD:${{ github.event.pull_request.head.ref }}
+          fi
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: ''
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
       - name: Classify reviewed UpdateManager literals
         shell: bash
         run: |
@@ -82,6 +295,7 @@ jobs:
             git commit -m "Classify GWS updater safety literals"
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
           fi
+
       - name: Compile and capture diagnostics
         shell: bash
         run: |
@@ -91,6 +305,7 @@ jobs:
           RESULT=$?
           tail -n 250 gws-compile.log > gws-compile-tail.log
           exit $RESULT
+
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
