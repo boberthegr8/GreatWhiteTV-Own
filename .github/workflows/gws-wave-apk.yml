@@ -66,3 +66,17 @@ jobs:
           path: wave-apk/GWS-Wave-Preview.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish stable direct-download APK
+        shell: bash
+        run: |
+          cp wave-apk/GWS-Wave-Preview.apk /tmp/GWS-Wave-Preview.apk
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git switch --orphan gws-wave-downloads
+          git rm -rf . || true
+          cp /tmp/GWS-Wave-Preview.apk ./GWS-Wave-Preview.apk
+          printf '%s\n' '# GWS Wave APK' '' 'Stable direct-download branch for the isolated GWS Wave preview build.' 'This branch is separate from GWS Online and main.' > README.md
+          git add GWS-Wave-Preview.apk README.md
+          git commit -m "Publish latest GWS Wave preview APK"
+          git push --force origin HEAD:gws-wave-downloads
