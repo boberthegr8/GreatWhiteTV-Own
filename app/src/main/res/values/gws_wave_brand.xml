@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wave_app_name">GWS Wave</string>
+    <string name="wave_brand_gws">GWS</string>
+    <string name="wave_brand_wave"> Wave</string>
+    <string name="wave_profile_default">GWS Wave User</string>
+    <string name="wave_browse">Browse</string>
+</resources>
