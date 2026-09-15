@@ -33,14 +33,17 @@ jobs:
       - name: Apply Wave service presets
         run: python3 tools/gws_wave_service_presets.py
 
-      - name: Commit generated Wave source change
+      - name: Normalize i18n records
+        run: python3 tools/i18n/check_hardcoded_strings.py prune-safe
+
+      - name: Commit generated Wave source changes
         shell: bash
         run: |
-          if ! git diff --quiet -- app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt; then
+          if ! git diff --quiet; then
             git config user.name github-actions[bot]
             git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-            git add app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt
-            git commit -m "GWS Wave: add TV service and editable DNS selector"
+            git add app/src/main/java/tv/own/owntv/features/setup/AddSourceScreen.kt tools/i18n/safe_literals.txt tools/i18n/hardcoded_baseline.txt
+            git commit -m "GWS Wave: normalize generated setup records"
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
           fi
 
