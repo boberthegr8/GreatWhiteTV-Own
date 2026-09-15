@@ -32,7 +32,7 @@ Wave deliberately keeps the mature underlying implementation already present in 
 - Subtitle support
 - Android TV home/Watch Next integration
 - Remote/companion setup infrastructure
-- Existing database, sync workers and update system
+- Existing database and sync workers
 
 ## Wave UX priorities
 
@@ -48,9 +48,12 @@ Wave deliberately keeps the mature underlying implementation already present in 
 
 - Gradle project renamed to `GWSWave`.
 - Launcher/app label changed to `GWS Wave`.
+- Android application ID changed to `tv.gws.wave`, allowing Wave and GWS Online to be installed side by side with separate app data.
+- Home is always retained as a valid top-level destination instead of being redirected to Live TV by dynamic navigation.
 - Home brand lockup changed to GWS Wave.
 - Main navigation changed to Home, Live TV, Guide, Movies, Series, Search and Settings.
 - Existing source, EPG, player, profile and catalog implementations remain intact.
+- The inherited GWS Online updater must remain disabled for the Wave package until Wave has a dedicated release feed, preventing it from offering a GWS Online APK to a Wave install.
 
 ## Next implementation passes
 
