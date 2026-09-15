@@ -98,6 +98,12 @@ class UpdateManager(
 
     /** Queries GWS Online's latest release. */
     fun checkManual() {
+        // GWS Wave is a separate applicationId and must never install GWS Online release APKs.
+        // Keep this updater dormant until Wave has a dedicated release feed.
+        if (context.packageName == "tv.gws.wave") {
+            _state.value = State.UpToDate
+            return
+        }
         if (_state.value is State.Checking || _state.value is State.Downloading) return
         _state.value = State.Checking
         scope.launch {
