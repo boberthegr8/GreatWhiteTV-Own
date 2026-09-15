@@ -11,7 +11,7 @@ jobs:
   build-wave-apk:
     runs-on: ubuntu-latest
     env:
-      EXPECTED_CERT_SHA256: "EDD594E18F5DAC75B6A15727E2D19CE54DADE3FD2B90B7AE5346E4FD83CCC81C"
+      EXPECTED_CERT_SHA256: "747D79B61658943AB4B882E74C122E27B0472E3C9D76A256D7936AC5ABE365A9"
     steps:
       - name: Checkout GWS Wave branch
         uses: actions/checkout@v4
@@ -42,47 +42,6 @@ jobs:
           echo "WAVE_VERSION_NAME=$NAME" >> "$GITHUB_ENV"
           echo "GWS Wave version: $NAME ($CODE)"
 
-      - name: Restore permanent signing key
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD_SECRET: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS_SECRET: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD_SECRET: ${{ secrets.KEY_PASSWORD }}
-          GREATWHITE_TV_SIGNING_BUNDLE: ${{ secrets.GREATWHITE_TV_SIGNING_BUNDLE }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            test -n "$KEYSTORE_PASSWORD_SECRET"
-            test -n "$KEY_ALIAS_SECRET"
-            test -n "$KEY_PASSWORD_SECRET"
-            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/wave-release.keystore"
-            echo "::add-mask::$KEYSTORE_PASSWORD_SECRET"
-            echo "::add-mask::$KEY_PASSWORD_SECRET"
-            echo "KEYSTORE_FILE=$RUNNER_TEMP/wave-release.keystore" >> "$GITHUB_ENV"
-            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD_SECRET" >> "$GITHUB_ENV"
-            echo "KEY_ALIAS=$KEY_ALIAS_SECRET" >> "$GITHUB_ENV"
-            echo "KEY_PASSWORD=$KEY_PASSWORD_SECRET" >> "$GITHUB_ENV"
-          elif [ -n "$GREATWHITE_TV_SIGNING_BUNDLE" ]; then
-            mkdir -p "$RUNNER_TEMP/wave-signing"
-            printf '%s' "$GREATWHITE_TV_SIGNING_BUNDLE" | base64 --decode > "$RUNNER_TEMP/wave-signing.zip"
-            unzip -q "$RUNNER_TEMP/wave-signing.zip" -d "$RUNNER_TEMP/wave-signing"
-            test -s "$RUNNER_TEMP/wave-signing/signing/GreatWhiteTV-release.jks"
-            test -s "$RUNNER_TEMP/wave-signing/signing.env"
-            set -a
-            . "$RUNNER_TEMP/wave-signing/signing.env"
-            set +a
-            echo "::add-mask::$KEYSTORE_PASSWORD"
-            echo "::add-mask::$KEY_PASSWORD"
-            echo "KEYSTORE_FILE=$RUNNER_TEMP/wave-signing/signing/GreatWhiteTV-release.jks" >> "$GITHUB_ENV"
-            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
-            echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
-            echo "KEY_PASSWORD=$KEY_PASSWORD" >> "$GITHUB_ENV"
-          else
-            echo "::error::GWS Wave self-updates require the repository's permanent signing key."
-            exit 1
-          fi
-
       - name: Apply Wave service presets
         run: python3 tools/gws_wave_service_presets.py
 
@@ -112,6 +71,27 @@ jobs:
             git commit -m "GWS Wave: apply generated Wave-only source changes"
             git push origin HEAD:${{ github.event.pull_request.head.ref }}
           fi
+
+      - name: Restore dedicated GWS Wave signing key
+        env:
+          WAVE_KEYSTORE_BASE64: ${{ secrets.WAVE_KEYSTORE_BASE64 }}
+          WAVE_KEYSTORE_PASSWORD: ${{ secrets.WAVE_KEYSTORE_PASSWORD }}
+          WAVE_KEY_ALIAS: ${{ secrets.WAVE_KEY_ALIAS }}
+          WAVE_KEY_PASSWORD: ${{ secrets.WAVE_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$WAVE_KEYSTORE_BASE64" ] || [ -z "$WAVE_KEYSTORE_PASSWORD" ] || [ -z "$WAVE_KEY_ALIAS" ] || [ -z "$WAVE_KEY_PASSWORD" ]; then
+            echo "::error::Dedicated GWS Wave signing secrets are not configured. See GWS-Wave-Permanent-Signing-Setup.zip."
+            exit 1
+          fi
+          printf '%s' "$WAVE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/gws-wave-release.jks"
+          echo "::add-mask::$WAVE_KEYSTORE_PASSWORD"
+          echo "::add-mask::$WAVE_KEY_PASSWORD"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/gws-wave-release.jks" >> "$GITHUB_ENV"
+          echo "KEYSTORE_PASSWORD=$WAVE_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$WAVE_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$WAVE_KEY_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Build permanently signed GWS Wave APK
         shell: bash
