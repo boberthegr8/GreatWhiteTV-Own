@@ -10,3 +10,5 @@ Experimental Great White Android client based on the community Stremio Native An
 - No third-party piracy-oriented add-ons are bundled or auto-installed.
 
 Upstream: https://github.com/stremio-native/stremio-android
+
+Build trigger: initial GWS compatibility build.
