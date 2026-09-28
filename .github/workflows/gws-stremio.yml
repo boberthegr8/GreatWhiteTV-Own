@@ -1,0 +1,69 @@
+name: Build GWS Stremio
+
+on:
+  push:
+    branches: [ gws-stremio ]
+    paths:
+      - '.github/workflows/gws-stremio.yml'
+      - 'gws-stremio/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Clone upstream Stremio Native Android
+        run: git clone --depth 1 --recurse-submodules https://github.com/stremio-native/stremio-android.git stremio-src
+
+      - name: Apply Great White identity
+        working-directory: stremio-src
+        shell: bash
+        run: |
+          set -e
+          # Keep Kotlin namespace intact; change only install identity so it can coexist with Stremio.
+          sed -i 's/applicationId = "com.stremio.mobile"/applicationId = "tv.gws.stremio"/' app/build.gradle.kts
+          # Google services config is tied to upstream application id. GWS build does not need analytics.
+          sed -i '/id("com.google.gms.google-services")/d' app/build.gradle.kts
+          sed -i '/id("com.google.firebase.crashlytics")/d' app/build.gradle.kts
+          sed -i '/id("com.google.firebase.firebase-perf")/d' app/build.gradle.kts
+          sed -i '/implementation(platform("com.google.firebase:firebase-bom:/d' app/build.gradle.kts
+          sed -i '/implementation("com.google.firebase:/d' app/build.gradle.kts
+          sed -i 's/<string name="app_name">[^<]*<\/string>/<string name="app_name">Great White Stremio<\/string>/' app/src/main/res/values/strings.xml || true
+          # TV launcher support without removing normal phone launcher.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("app/src/main/AndroidManifest.xml")
+          s=p.read_text()
+          if 'android.software.leanback' not in s:
+              s=s.replace('<uses-permission android:name="android.permission.INTERNET" />',
+                  '<uses-permission android:name="android.permission.INTERNET" />\n    <uses-feature android:name="android.software.leanback" android:required="false" />\n    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />')
+          if 'android.intent.category.LEANBACK_LAUNCHER' not in s:
+              marker='<category android:name="android.intent.category.LAUNCHER" />'
+              s=s.replace(marker, marker+'\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />')
+          p.write_text(s)
+          PY
+
+      - name: Build universal debug APK
+        working-directory: stremio-src
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          APK=$(find stremio-src/app/build/outputs/apk/debug -name '*universal*debug*.apk' -o -name '*debug*.apk' | head -1)
+          cp "$APK" out/gws-stremio-test.apk
+          sha256sum out/gws-stremio-test.apk > out/gws-stremio-test.apk.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gws-stremio-test
+          path: out/*
