@@ -31,6 +31,8 @@ jobs:
           set -e
           # Keep Kotlin namespace intact; change only install identity so it can coexist with Stremio.
           sed -i 's/applicationId = "com.stremio.mobile"/applicationId = "tv.gws.stremio"/' app/build.gradle.kts
+          # Keep Firebase libraries required by source, but disable google-services package processing for the GWS package.
+          sed -i '/id("com.google.gms.google-services")/d' app/build.gradle.kts
           sed -i 's/<string name="app_name">[^<]*<\/string>/<string name="app_name">Great White Stremio<\/string>/' app/src/main/res/values/strings.xml || true
           # TV launcher support without removing normal phone launcher.
           python3 - <<'PY'
