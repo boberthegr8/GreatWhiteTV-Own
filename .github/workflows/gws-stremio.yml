@@ -54,7 +54,7 @@ jobs:
 
       - name: Build universal debug APK
         working-directory: stremio-src
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: chmod +x gradlew && ./gradlew :app:assembleDebug --stacktrace
 
       - name: Collect APK
         run: |
