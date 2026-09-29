@@ -33,6 +33,13 @@ jobs:
           sed -i 's/applicationId = "com.stremio.mobile"/applicationId = "tv.gws.stremio"/' app/build.gradle.kts
           # Keep Firebase libraries required by source, but disable google-services package processing for the GWS package.
           sed -i '/id("com.google.gms.google-services")/d' app/build.gradle.kts
+          # Remove Firebase/Performance/PostHog completely. Renaming applicationId without a matching Google app config
+          # leaves package-bound Firebase components in the merged manifest and can crash during process startup.
+          sed -i '/id("com.google.firebase.crashlytics")/d' app/build.gradle.kts
+          sed -i '/id("com.google.firebase.firebase-perf")/d' app/build.gradle.kts
+          sed -i '/implementation(platform("com.google.firebase:firebase-bom:/d' app/build.gradle.kts
+          sed -i '/implementation("com.google.firebase:/d' app/build.gradle.kts
+          sed -i '/implementation("com.posthog:posthog-android:/d' app/build.gradle.kts
           # GWS fork: remove upstream Firebase/PostHog telemetry startup so the renamed package can launch independently.
           python3 - <<'PY'
           from pathlib import Path
