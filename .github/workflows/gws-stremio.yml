@@ -52,12 +52,21 @@ jobs:
         working-directory: stremio-src
         run: chmod +x gradlew && ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Collect APK
+      - name: Collect universal and ARM APKs
         run: |
+          set -euo pipefail
           mkdir -p out
-          APK=$(find stremio-src/app/build/outputs/apk/debug -name '*universal*debug*.apk' -o -name '*debug*.apk' | head -1)
-          cp "$APK" out/gws-stremio-test.apk
-          sha256sum out/gws-stremio-test.apk > out/gws-stremio-test.apk.sha256
+          find stremio-src/app/build/outputs/apk/debug -type f -name '*.apk' -print
+          UNIVERSAL=$(find stremio-src/app/build/outputs/apk/debug -type f -name '*universal*debug*.apk' | head -1)
+          ARM64=$(find stremio-src/app/build/outputs/apk/debug -type f -name '*arm64-v8a*debug*.apk' | head -1)
+          ARM32=$(find stremio-src/app/build/outputs/apk/debug -type f -name '*armeabi-v7a*debug*.apk' | head -1)
+          test -n "$UNIVERSAL" && test -f "$UNIVERSAL"
+          test -n "$ARM64" && test -f "$ARM64"
+          test -n "$ARM32" && test -f "$ARM32"
+          cp "$UNIVERSAL" out/gws-stremio-universal-test.apk
+          cp "$ARM64" out/gws-stremio-arm64-test.apk
+          cp "$ARM32" out/gws-stremio-arm32-test.apk
+          sha256sum out/*.apk > out/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
