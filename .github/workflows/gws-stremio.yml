@@ -33,6 +33,25 @@ jobs:
           sed -i 's/applicationId = "com.stremio.mobile"/applicationId = "tv.gws.stremio"/' app/build.gradle.kts
           # Keep Firebase libraries required by source, but disable google-services package processing for the GWS package.
           sed -i '/id("com.google.gms.google-services")/d' app/build.gradle.kts
+          # GWS fork: remove upstream Firebase/PostHog telemetry startup so the renamed package can launch independently.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("app/src/main/java/com/stremio/mobile/MainApplication.kt")
+          s=p.read_text()
+          s=s.replace("import com.google.firebase.crashlytics.FirebaseCrashlytics\n", "")
+          s=s.replace("import com.posthog.android.PostHogAndroid\n", "")
+          s=s.replace("import com.posthog.android.PostHogAndroidConfig\n", "")
+          start=s.find("class CrashlyticsTree : Timber.Tree()")
+          end=s.find("class MainApplication", start)
+          if start != -1 and end != -1:
+              s=s[:start]+s[end:]
+          s=s.replace("        Timber.plant(CrashlyticsTree())\n", "")
+          start=s.find("        val analyticsEnabled = container.authRepository.isAnalyticsEnabled()")
+          end=s.find("\n\n    }", start)
+          if start != -1 and end != -1:
+              s=s[:start]+s[end:]
+          p.write_text(s)
+          PY
           sed -i 's/<string name="app_name">[^<]*<\/string>/<string name="app_name">Great White Stremio<\/string>/' app/src/main/res/values/strings.xml || true
           # TV launcher support without removing normal phone launcher.
           python3 - <<'PY'
