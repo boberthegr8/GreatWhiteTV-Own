@@ -37,9 +37,8 @@ jobs:
           # leaves package-bound Firebase components in the merged manifest and can crash during process startup.
           sed -i '/id("com.google.firebase.crashlytics")/d' app/build.gradle.kts
           sed -i '/id("com.google.firebase.firebase-perf")/d' app/build.gradle.kts
-          sed -i '/implementation(platform("com.google.firebase:firebase-bom:/d' app/build.gradle.kts
-          sed -i '/implementation("com.google.firebase:/d' app/build.gradle.kts
-          sed -i '/implementation("com.posthog:posthog-android:/d' app/build.gradle.kts
+          # Keep runtime libraries because MainViewModel still references their APIs.
+          # Their Gradle plugins and Application startup initialization remain disabled.
           # GWS fork: remove upstream Firebase/PostHog telemetry startup so the renamed package can launch independently.
           python3 - <<'PY'
           from pathlib import Path
