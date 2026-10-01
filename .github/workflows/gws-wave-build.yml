@@ -1,0 +1,55 @@
+name: GWS Wave APK
+
+on:
+  push:
+    branches: [ gws-wave ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-wave:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GWS Wave
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build GWS Wave APK
+        shell: bash
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleStandardDebug
+
+      - name: Collect APK
+        shell: bash
+        run: |
+          mkdir -p wave-apk
+          APK="$(find app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          if [ -z "$APK" ]; then
+            echo "No APK produced"
+            exit 1
+          fi
+          cp "$APK" wave-apk/GWS-Wave.apk
+
+      - name: Upload GWS Wave APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: GWS-Wave-APK
+          path: wave-apk/GWS-Wave.apk
+          if-no-files-found: error
+          retention-days: 30

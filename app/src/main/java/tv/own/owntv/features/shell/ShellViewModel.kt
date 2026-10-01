@@ -62,7 +62,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
 
         /** All six browse items — the default `visibleSections` value so the rail shows everything until
          *  the first real emission lands (avoids a cold-start flicker to an empty rail). */
-        val allBrowse: Set<MainSection> = browseOrder.toSet()
+        val allBrowse: Set<MainSection> = browseOrder.toSet() + HOME
 
         /**
          * DYNAMIC-mode rule (v4.3.0): which browse icons show given the active playlist's content caps.
@@ -72,6 +72,7 @@ enum class MainSection(@param:androidx.annotation.StringRes val labelRes: Int) {
          * screen's read-only DYNAMIC rows) so both agree on what DYNAMIC mode shows.
          */
         fun dynamicVisible(hasLive: Boolean, hasMovies: Boolean, hasSeries: Boolean): Set<MainSection> = buildSet {
+            add(HOME)
             if (hasLive) add(LIVE_TV)
             if (hasMovies) add(MOVIES)
             if (hasSeries) add(SERIES)

@@ -80,6 +80,22 @@ import tv.own.owntv.ui.theme.OwnTVTheme
 
 private enum class SourceKind { XTREAM, M3U, STALKER }
 
+private enum class WaveService(@param:StringRes val labelRes: Int, @param:StringRes val dnsRes: Int?) {
+    HUSH(R.string.wave_service_hush, R.string.wave_service_hush_dns),
+    CCTV(R.string.wave_service_cctv, R.string.wave_service_cctv_dns),
+    PUREVISION(R.string.wave_service_purevision, R.string.wave_service_purevision_dns),
+    CUSTOM(R.string.wave_service_custom, null),
+}
+
+private fun normalizedWaveDns(value: String): String = value.trim().trimEnd('/')
+
+private fun detectWaveService(server: String, hush: String, cctv: String, purevision: String): WaveService = when (normalizedWaveDns(server)) {
+    normalizedWaveDns(hush) -> WaveService.HUSH
+    normalizedWaveDns(cctv) -> WaveService.CCTV
+    normalizedWaveDns(purevision) -> WaveService.PUREVISION
+    else -> WaveService.CUSTOM
+}
+
 /** UI state of the Stalker "Test connection" probe (mapped from the owning ViewModel's state). */
 sealed interface StalkerTestUi {
     data object Idle : StalkerTestUi
@@ -158,6 +174,14 @@ fun AddSourceScreen(
 ) {
     val colors = OwnTVTheme.colors
     val editing = initial != null
+    val hushDns = stringResource(R.string.wave_service_hush_dns)
+    val cctvDns = stringResource(R.string.wave_service_cctv_dns)
+    val purevisionDns = stringResource(R.string.wave_service_purevision_dns)
+    val waveDnsByService = mapOf(
+        WaveService.HUSH to hushDns,
+        WaveService.CCTV to cctvDns,
+        WaveService.PUREVISION to purevisionDns,
+    )
     var kind by remember {
         mutableStateOf(
             when (initial?.type) {
@@ -168,7 +192,8 @@ fun AddSourceScreen(
         )
     }
     var name by remember(initial) { mutableStateOf(initial?.name ?: "") }
-    var server by remember(initial) { mutableStateOf(if (initial != null && initial.type == SourceType.XTREAM) initial.url else "") }
+    var server by remember(initial, hushDns) { mutableStateOf(if (initial != null && initial.type == SourceType.XTREAM) initial.url else hushDns) }
+    var waveService by remember(initial, hushDns, cctvDns, purevisionDns) { mutableStateOf(detectWaveService(server, hushDns, cctvDns, purevisionDns)) }
     var username by remember(initial) { mutableStateOf(initial?.username ?: "") }
     var password by remember(initial) { mutableStateOf(initial?.password ?: "") }
     var m3uUrl by remember(initial) { mutableStateOf(if (initial != null && initial.type == SourceType.M3U) initial.url else "") }
@@ -198,6 +223,7 @@ fun AddSourceScreen(
     var hasRemoteStalkerScopes by remember { mutableStateOf(false) }
     var showFileBrowser by remember { mutableStateOf(false) }
     var showAutoRefreshPicker by remember { mutableStateOf(false) }
+    var showWaveServicePicker by remember { mutableStateOf(false) }
     val firstFocus = remember { FocusRequester() }
     val startImportFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
@@ -381,7 +407,30 @@ fun AddSourceScreen(
 
             when (kind) {
                 SourceKind.XTREAM -> {
-                    OwnTVTextField(server, { server = it }, label = stringResource(R.string.setup_server_url), placeholder = stringResource(R.string.setup_server_example), keyboardType = KeyboardType.Uri, modifier = Modifier.fillMaxWidth())
+                    Text(stringResource(R.string.wave_service_title), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+                    Spacer(Modifier.height(4.dp))
+                    Text(stringResource(R.string.wave_service_description), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                    Spacer(Modifier.height(10.dp))
+                    OwnTVButton(
+                        label = stringResource(waveService.labelRes),
+                        onClick = { showWaveServicePicker = true },
+                        style = OwnTVButtonStyle.SECONDARY,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    OwnTVTextField(
+                        server,
+                        {
+                            server = it
+                            waveService = detectWaveService(it, hushDns, cctvDns, purevisionDns)
+                        },
+                        label = stringResource(R.string.wave_dns_server),
+                        placeholder = stringResource(R.string.setup_server_example),
+                        keyboardType = KeyboardType.Uri,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(stringResource(R.string.wave_dns_change_hint), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
                     Spacer(Modifier.height(14.dp))
                     OwnTVTextField(username, { username = it }, label = stringResource(R.string.setup_username), modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(14.dp))
@@ -612,6 +661,20 @@ fun AddSourceScreen(
                   showUaPresetPicker = false
               },
               onDismiss = { showUaPresetPicker = false },
+          )
+      }
+      if (showWaveServicePicker) {
+          PickerDialog(
+              title = stringResource(R.string.wave_service_picker_title),
+              options = WaveService.entries.map { it.name to stringResource(it.labelRes) },
+              selected = waveService.name,
+              onSelect = { value ->
+                  val selected = runCatching { WaveService.valueOf(value) }.getOrDefault(WaveService.CUSTOM)
+                  waveService = selected
+                  waveDnsByService[selected]?.let { server = it }
+                  showWaveServicePicker = false
+              },
+              onDismiss = { showWaveServicePicker = false },
           )
       }
       if (showAutoRefreshPicker) {
